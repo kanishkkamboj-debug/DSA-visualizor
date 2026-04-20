@@ -1,7 +1,13 @@
 import React from 'react';
 import SortVisualizer from './algorithms/SortVisualizer';
-import DPTableVisualizer from './algorithms/DPTableVisualizer';
 import GraphVisualizer from './algorithms/GraphVisualizer';
+import ArrayVisualizer from './algorithms/ArrayVisualizer';
+import StringVisualizer from './algorithms/StringVisualizer';
+import LinkedListVisualizer from './algorithms/LinkedListVisualizer';
+import TreeVisualizer from './algorithms/TreeVisualizer';
+import StackQueueVisualizer from './algorithms/StackQueueVisualizer';
+import HashVisualizer from './algorithms/HashVisualizer';
+import DPTableVisualizer from './algorithms/DPTableVisualizer';
 
 // IDs that have dedicated visualizers
 const SORT_IDS = new Set([
@@ -12,15 +18,47 @@ const SORT_IDS = new Set([
   'linear_search', 'lower_upper_bound', 'search_rotated', 'search_2d', 'peak_element', 'kth_missing',
 ]);
 
-const DP_IDS = new Set([
-  'lcs', 'matrix_chain',
-  'fib_dp', 'climbing_stairs', 'knapsack_01', 'coin_change',
-  'lis', 'edit_distance', 'house_robber', 'subset_sum',
+
+
+const ARRAY_IDS = new Set([
+  'traversal', 'prefix_sum', 'suffix_sum', 'two_pointer', 'sliding_window', 'kadane', 'dutch_flag',
+  'merge_intervals', 'next_permutation', 'boyer_moore', 'rotate_array', 'trapping_rain',
+  'stock_buy_sell', 'max_product_subarray', 'subarray_sum'
+]);
+
+const STRING_IDS = new Set([
+  'reverse_string', 'palindrome_check', 'anagram_check', 'longest_common_prefix', 
+  'sliding_window_str', 'kmp', 'rabin_karp', 'z_algorithm', 'manacher', 'min_window_substr', 'string_matching'
+]);
+
+const LL_IDS = new Set([
+  'll_reverse', 'll_cycle', 'll_middle', 'll_merge_sorted', 'll_remove_nth', 'll_intersection', 'll_reverse_k', 'll_lru'
+]);
+
+const TREE_IDS = new Set([
+  'tree_inorder', 'tree_preorder', 'tree_postorder', 'tree_level_order', 
+  'tree_max_depth', 'tree_diameter', 'tree_same_tree', 'tree_lca', 'tree_max_path_sum',
+  'bst_search', 'bst_insert', 'bst_delete', 'bst_validate', 'bst_kth_smallest', 'bst_lca', 'bst_successor',
+  'heap_min', 'heap_max', 'heap_kth_largest', 'heap_median'
+]);
+
+const STACK_QUEUE_IDS = new Set([
+  'next_greater', 'prev_greater', 'valid_parens', 'largest_rectangle', 'min_stack', 'infix_postfix',
+  'queue_using_stack', 'stack_using_queue', 'sliding_window_max', 'circular_queue'
+]);
+
+const HASH_IDS = new Set([
+  'freq_count', 'two_sum_hash', 'subarray_sum_k', 'longest_consecutive', 'group_anagrams'
 ]);
 
 const GRAPH_IDS = new Set([
-  'kruskal', 'huffman', 'prim',
-  'graph_dfs', 'graph_bfs', 'dijkstra', 'bellman_ford', 'dsu', 'bipartite_check',
+  'graph_dfs', 'graph_bfs', 'dijkstra', 'bellman_ford', 'floyd_warshall', 
+  'prim', 'kruskal', 'topological_sort', 'dsu', 'bipartite_check'
+]);
+
+const DP_IDS = new Set([
+  'fib_dp', 'climbing_stairs', 'knapsack_01', 'coin_change', 'lcs', 
+  'lis', 'edit_distance', 'matrix_chain', 'house_robber', 'subset_sum'
 ]);
 
 const ComingSoon = ({ algorithm, category }) => (
@@ -62,6 +100,24 @@ const VizView = ({ algorithm, category }) => {
     }
     if (GRAPH_IDS.has(algorithm.id)) {
       return <GraphVisualizer algorithmId={algorithm.id} />;
+    }
+    if (ARRAY_IDS.has(algorithm.id)) {
+      return <ArrayVisualizer algorithmId={algorithm.id} />;
+    }
+    if (STRING_IDS.has(algorithm.id)) {
+      return <StringVisualizer algorithmId={algorithm.id} />;
+    }
+    if (LL_IDS.has(algorithm.id)) {
+      return <LinkedListVisualizer algorithmId={algorithm.id} />;
+    }
+    if (TREE_IDS.has(algorithm.id)) {
+      return <TreeVisualizer algorithmId={algorithm.id} />;
+    }
+    if (STACK_QUEUE_IDS.has(algorithm.id)) {
+      return <StackQueueVisualizer algorithmId={algorithm.id} />;
+    }
+    if (HASH_IDS.has(algorithm.id)) {
+      return <HashVisualizer algorithmId={algorithm.id} />;
     }
     return <ComingSoon algorithm={algorithm} category={category} />;
   };
