@@ -2,298 +2,288 @@ import React, { useState, useEffect, useRef } from 'react';
 import StepLog from './StepLog';
 
 const HashVisualizer = ({ algorithmId }) => {
-  const [inputArray, setInputArray] = useState([]);
-  
   const [speed, setSpeed] = useState(300);
   const [mode, setMode] = useState('auto');
-  const [customInput, setCustomInput] = useState('');
-  
-  const [isRunning, setIsRunning] = useState(false);
+  const [customInputA, setCustomInputA] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
-  
-  // Visualization State
-  const [steps, setSteps] = useState([]);
-  const [pointers, setPointers] = useState({}); // array pointers
-  const [activeIndices, setActiveIndices] = useState([]);
-  const [hashMap, setHashMap] = useState({}); // { key: { val: X, active: bool } }
-  const [variables, setVariables] = useState({});
-  const [result, setResult] = useState(null);
 
-  const abortController = useRef(null);
+  // --- Snapshot Animation Engine State ---
+  const [trace, setTrace] = useState([]);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   useEffect(() => {
-    reset();
+    initData();
   }, [algorithmId]);
 
-  const reset = () => {
-    if (abortController.current) abortController.current.abort();
-    generateData();
-    setIsRunning(false);
-    setSteps([]); setPointers({}); setActiveIndices([]); setHashMap({}); setVariables({}); setResult(null);
-    setErrorMsg('');
-  };
+  useEffect(() => {
+    let timer;
+    if (isPlaying && currentStep < trace.length - 1) {
+      timer = setTimeout(() => {
+        setCurrentStep(prev => prev + 1);
+      }, speed);
+    } else if (currentStep >= trace.length - 1 && trace.length > 0) {
+      setIsPlaying(false);
+    }
+    return () => clearTimeout(timer);
+  }, [isPlaying, currentStep, trace, speed]);
 
-  const generateData = () => {
-    if (mode === 'custom' && customInput) {
-      if (algorithmId === 'group_anagrams') {
-        setInputArray(customInput.split(',').map(s => s.trim()));
-      } else {
-        setInputArray(customInput.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n)));
-      }
-      return;
-    }
-    
-    if (algorithmId === 'freq_count') {
-      setInputArray([1, 2, 2, 3, 1, 4, 2]);
-    } else if (algorithmId === 'two_sum_hash') {
-      setInputArray([2, 7, 11, 15]);
-    } else if (algorithmId === 'subarray_sum_k') {
-      setInputArray([1, 1, 1]);
-    } else if (algorithmId === 'longest_consecutive') {
-      setInputArray([100, 4, 200, 1, 3, 2]);
-    } else if (algorithmId === 'group_anagrams') {
-      setInputArray(['eat', 'tea', 'tan', 'ate', 'nat', 'bat']);
-    } else {
-      setInputArray([1, 2, 3]);
-    }
+  const initData = () => {
+    setIsPlaying(false);
+    setTrace([]);
+    setCurrentStep(0);
+    setErrorMsg('');
   };
 
   const applyCustom = () => {
-    if (!customInput) return;
-    setErrorMsg('');
-    reset();
-    if (algorithmId === 'group_anagrams') {
-      setInputArray(customInput.split(',').map(s => s.trim()));
-    } else {
-      setInputArray(customInput.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n)));
-    }
+    if (!customInputA.trim()) return;
+    initData();
   };
 
-  const sleep = (ms, signal) => {
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(resolve, ms);
-      signal.addEventListener('abort', () => {
-        clearTimeout(timeout);
-        reject(new DOMException('Aborted', 'AbortError'));
-      });
-    });
-  };
-
-  const addStep = (msg) => setSteps(prev => [...prev, msg]);
-
-  const updateHash = (k, v, active = true) => {
-    setHashMap(prev => ({
-      ...prev,
-      [k]: { val: v, active }
-    }));
-  };
-  const clearHashActive = () => {
-    setHashMap(prev => {
-      const next = {};
-      for (const k in prev) next[k] = { ...prev[k], active: false };
-      return next;
-    });
-  };
-
-  const execute = async () => {
-    if (isRunning) return;
-    setIsRunning(true);
-    setSteps([]); setPointers({}); setActiveIndices([]); setHashMap({}); setVariables({}); setResult(null);
-    
-    abortController.current = new AbortController();
-    const signal = abortController.current.signal;
-
-    try {
-      const arr = [...inputArray];
-      switch (algorithmId) {
-        case 'freq_count': await runFreqCount(arr, signal); break;
-        case 'two_sum_hash': await runTwoSum(arr, signal); break;
-        case 'subarray_sum_k': await runSubarraySum(arr, signal); break;
-        case 'longest_consecutive': await runLongestConsecutive(arr, signal); break;
-        case 'group_anagrams': await runGroupAnagrams(arr, signal); break;
-        default: addStep(`Logic for ${algorithmId} coming soon.`);
-      }
-      if (!signal.aborted) addStep('Algorithm complete.');
-    } catch (err) {
-      if (err.name !== 'AbortError') console.error(err);
-      addStep('Execution stopped.');
-    } finally {
-      setIsRunning(false);
-      clearHashActive();
-    }
-  };
-
-  const abort = () => { if (abortController.current) abortController.current.abort(); };
-
-  // --- Algorithm Implementations ---
-
-  const runFreqCount = async (arr, signal) => {
-    addStep('Frequency Count: O(N) using Hash Map');
-    const map = {};
-    for (let i = 0; i < arr.length; i++) {
-      setPointers({ i }); setActiveIndices([i]);
-      const val = arr[i];
-      addStep(`Processing ${val}`);
-      await sleep(speed, signal);
-      
-      clearHashActive();
-      if (map[val] === undefined) {
-        map[val] = 1;
-        addStep(`Key ${val} not found. Inserting with count 1.`);
+  const getInitialData = () => {
+    if (mode === 'custom' && customInputA) {
+      if (algorithmId === 'group_anagrams') {
+        return customInputA.split(',').map(s => s.trim());
       } else {
-        map[val]++;
-        addStep(`Key ${val} found. Incrementing count to ${map[val]}.`);
+        return customInputA.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
       }
-      updateHash(val, map[val], true);
-      await sleep(speed * 1.2, signal);
     }
-    clearHashActive();
+    
+    switch (algorithmId) {
+      case 'freq_count': return [2, 1, 2, 3, 1, 1, 4];
+      case 'two_sum_hash': return [2, 7, 11, 15];
+      case 'subarray_sum_k': return [1, 1, 1]; // K will be 2
+      case 'longest_consecutive': return [100, 4, 200, 1, 3, 2];
+      case 'group_anagrams': return ["eat", "tea", "tan", "ate", "nat", "bat"];
+      default: return [1, 2, 3, 4, 5];
+    }
   };
 
-  const runTwoSum = async (arr, signal) => {
-    const target = 9;
-    setVariables({ Target: target });
-    addStep(`Two Sum: Find pair that sums to ${target}. Using complement hash map.`);
+  const executeAlgo = () => {
+    if (trace.length > 0 && currentStep === 0) { setIsPlaying(true); return; }
+    if (currentStep > 0 && currentStep < trace.length - 1) { setIsPlaying(true); return; }
+    if (currentStep >= trace.length - 1 && trace.length > 0) { setCurrentStep(0); setIsPlaying(true); return; }
+
+    const inputData = getInitialData();
+    const newTrace = [];
     
-    const map = {}; // val -> index
+    const pushState = (inputArr, hashMap, ptrs={}, actInput=[], procInput=[], vars={}, msg='') => {
+      newTrace.push({
+        inputArr: [...inputArr],
+        hashMap: { ...hashMap }, // visual representation object
+        pointers: { ...ptrs },
+        activeInput: [...actInput],
+        processedInput: [...procInput],
+        variables: { ...vars },
+        msg
+      });
+    };
+
+    pushState(inputData, {}, {}, [], [], {}, `Starting ${algorithmId.replaceAll('_', ' ')}...`);
+
+    const arr = [...inputData];
+
+    switch (algorithmId) {
+      case 'freq_count': runFreqCount(arr, pushState); break;
+      case 'two_sum_hash': runTwoSumHash(arr, pushState); break;
+      case 'subarray_sum_k': runSubarraySumK(arr, pushState); break;
+      case 'longest_consecutive': runLongestConsecutive(arr, pushState); break;
+      case 'group_anagrams': runGroupAnagrams(arr, pushState); break;
+      default: pushState(arr, {}, {}, [], [], {}, `Logic for ${algorithmId} pending.`); break;
+    }
+
+    if (newTrace.length === 1) pushState(arr, {}, {}, [], [], {}, 'Finished.');
+
+    setTrace(newTrace);
+    setCurrentStep(0);
+    setIsPlaying(true);
+  };
+
+  // --- Algorithms ---
+
+  const runFreqCount = (arr, pushState) => {
+    const map = {};
+    const proc = [];
     
     for (let i = 0; i < arr.length; i++) {
-      setPointers({ i }); setActiveIndices([i]);
-      const num = arr[i];
-      const complement = target - num;
-      setVariables({ Target: target, Complement: `${target} - ${num} = ${complement}` });
+      const val = arr[i];
+      pushState(arr, map, { i }, [i], proc, {}, `Reading ${val}`);
       
-      addStep(`Checking if complement ${complement} exists in map.`);
-      clearHashActive();
-      await sleep(speed * 1.5, signal);
+      map[val] = (map[val] || 0) + 1;
+      proc.push(i);
       
-      if (map[complement] !== undefined) {
-        addStep(`Found complement ${complement} at index ${map[complement]}! Match found: [${map[complement]}, ${i}]`);
-        updateHash(complement, map[complement], true);
-        setResult(`[${map[complement]}, ${i}]`);
+      pushState(arr, map, { i }, [i], proc, {}, `Updated count for ${val} to ${map[val]}`);
+    }
+    pushState(arr, map, {}, [], proc, {}, `✅ Frequency Count complete.`);
+  };
+
+  const runTwoSumHash = (arr, pushState) => {
+    const target = 9; // Hardcoded for visualizer if array doesn't inherently imply one
+    const map = {}; // val -> index
+    const proc = [];
+    
+    pushState(arr, map, {}, [], [], { Target: target }, `Searching for Two Sum target: ${target}`);
+    
+    for (let i = 0; i < arr.length; i++) {
+      const val = arr[i];
+      const comp = target - val;
+      pushState(arr, map, { i }, [i], proc, { Target: target, Complement: comp }, `Checking ${val}. Need complement ${comp}`);
+      
+      if (map[comp] !== undefined) {
+        pushState(arr, map, { i }, [i, map[comp]], proc, { Target: target, Complement: comp }, `✅ Found complement ${comp} at index ${map[comp]}!`);
         return;
       }
       
-      addStep(`Complement ${complement} not found. Storing ${num} -> index ${i}`);
-      map[num] = i;
-      updateHash(num, i, true);
-      await sleep(speed, signal);
+      map[val] = i;
+      proc.push(i);
+      pushState(arr, map, { i }, [i], proc, { Target: target }, `Complement not found. Added ${val} to map.`);
     }
-    addStep('No valid pair found.');
+    pushState(arr, map, {}, [], proc, { Target: target }, `❌ No two elements sum to ${target}.`);
   };
 
-  const runSubarraySum = async (arr, signal) => {
-    const k = 2; // target sum
-    setVariables({ K: k, PrefixSum: 0, Count: 0 });
-    addStep(`Subarray Sum Equals K (K=${k}). Using Prefix Sum Hash Map.`);
-    
-    let sum = 0;
-    let count = 0;
+  const runSubarraySumK = (arr, pushState) => {
+    const k = 2; // target
+    let count = 0, prefix = 0;
     const map = { 0: 1 };
-    updateHash(0, 1, false);
-    addStep('Initialized map with { 0: 1 } to handle subarrays starting from index 0.');
-    await sleep(speed * 1.5, signal);
+    const proc = [];
+    
+    pushState(arr, map, {}, [], [], { Target_K: k, PrefixSum: prefix, Count: count }, `Subarray Sum Equals K. Initialized map with 0:1`);
     
     for (let i = 0; i < arr.length; i++) {
-      setPointers({ i }); setActiveIndices([i]);
-      sum += arr[i];
-      const diff = sum - k;
-      setVariables({ K: k, PrefixSum: sum, TargetDiff: diff, Count: count });
+      const val = arr[i];
+      prefix += val;
+      const comp = prefix - k;
       
-      addStep(`Index ${i}: val=${arr[i]}, new PrefixSum=${sum}. Searching for PrefixSum - K = ${diff} in map.`);
-      clearHashActive();
-      await sleep(speed * 1.5, signal);
+      pushState(arr, map, { i }, [i], proc, { Target_K: k, PrefixSum: prefix, Complement: comp, Count: count }, `Added ${val} to prefix. Checking map for complement ${comp}`);
       
-      if (map[diff]) {
-        count += map[diff];
-        setVariables({ K: k, PrefixSum: sum, TargetDiff: diff, Count: count });
-        addStep(`Found ${diff} in map! Added ${map[diff]} to count. Subarray found!`);
-        updateHash(diff, map[diff], true);
-        await sleep(speed * 1.5, signal);
+      if (map[comp]) {
+        count += map[comp];
+        pushState(arr, map, { i }, [i], proc, { Target_K: k, PrefixSum: prefix, Complement: comp, Count: count }, `✅ Found ${comp} in map ${map[comp]} time(s). Count is now ${count}`);
       } else {
-        addStep(`Diff ${diff} not found.`);
+        pushState(arr, map, { i }, [i], proc, { Target_K: k, PrefixSum: prefix, Complement: comp, Count: count }, `Complement not in map.`);
       }
       
-      map[sum] = (map[sum] || 0) + 1;
-      updateHash(sum, map[sum], true);
-      addStep(`Storing PrefixSum ${sum} into map.`);
-      await sleep(speed, signal);
+      map[prefix] = (map[prefix] || 0) + 1;
+      proc.push(i);
+      pushState(arr, map, { i }, [i], proc, { Target_K: k, PrefixSum: prefix, Count: count }, `Added/updated prefix sum ${prefix} in map.`);
     }
-    setResult(`Total count: ${count}`);
+    pushState(arr, map, {}, [], proc, { FinalCount: count }, `✅ Total subarrays sum to ${k}: ${count}`);
   };
 
-  const runLongestConsecutive = async (arr, signal) => {
-    addStep('Longest Consecutive Sequence: O(N) using Hash Set');
-    const set = new Set(arr);
+  const runLongestConsecutive = (arr, pushState) => {
+    const set = {};
+    for (let i = 0; i < arr.length; i++) set[arr[i]] = 'present';
     
-    // Fill hashmap visually as a set (val -> exists)
-    for (const num of arr) updateHash(num, 'exists', false);
-    addStep('Inserted all elements into Hash Set.');
-    await sleep(speed * 2, signal);
+    pushState(arr, set, {}, [], [], {}, `Added all elements to HashSet for O(1) lookups.`);
     
-    let maxLen = 0;
+    let longest = 0;
+    const proc = [];
+    
     for (let i = 0; i < arr.length; i++) {
-      setPointers({ i }); setActiveIndices([i]);
       const num = arr[i];
+      pushState(arr, set, { i }, [i], proc, { Longest: longest }, `Checking if ${num} is the start of a sequence.`);
       
-      clearHashActive();
-      updateHash(num, 'exists', true);
-      addStep(`Checking ${num}. Is it the start of a sequence?`);
-      await sleep(speed, signal);
-      
-      if (!set.has(num - 1)) {
-        addStep(`${num - 1} not in set. ${num} IS a start! Building sequence...`);
-        let curr = num;
-        let len = 1;
-        while (set.has(curr + 1)) {
-          curr++;
-          len++;
-          updateHash(curr, 'exists', true);
-          setVariables({ CurrentSequenceStart: num, Length: len, MaxLength: maxLen });
-          addStep(`Found ${curr}. Length is now ${len}.`);
-          await sleep(speed, signal);
+      if (!set[num - 1]) {
+        pushState(arr, set, { i }, [i], proc, { Longest: longest, CurrentSeq: num }, `${num-1} not in set. ${num} IS a start!`);
+        let currNum = num;
+        let currLen = 1;
+        
+        while (set[currNum + 1]) {
+          currNum += 1;
+          currLen += 1;
+          pushState(arr, set, { i }, [i], proc, { Longest: longest, CurrentSeq: `${num}..${currNum}`, Len: currLen }, `Found next consecutive ${currNum} in set.`);
         }
-        maxLen = Math.max(maxLen, len);
-        setVariables({ MaxLength: maxLen });
-        addStep(`Sequence ended at ${curr}. MaxLength = ${maxLen}`);
+        
+        longest = Math.max(longest, currLen);
+        pushState(arr, set, { i }, [i], proc, { Longest: longest }, `Sequence stopped. Max length so far: ${longest}`);
       } else {
-        updateHash(num - 1, 'exists', true);
-        addStep(`${num - 1} exists in set. ${num} is NOT a start, ignoring to maintain O(N).`);
+        pushState(arr, set, { i }, [i], proc, { Longest: longest }, `${num-1} is in set. ${num} is NOT a start, skipping.`);
       }
-      await sleep(speed * 1.2, signal);
+      proc.push(i);
     }
-    setResult(`Max Length: ${maxLen}`);
+    pushState(arr, set, {}, [], proc, { FinalLongest: longest }, `✅ Longest Consecutive Sequence length is ${longest}.`);
   };
 
-  const runGroupAnagrams = async (arr, signal) => {
-    addStep('Group Anagrams: Using sorted string as Hash Key.');
+  const runGroupAnagrams = (arr, pushState) => {
     const map = {};
+    const proc = [];
     
     for (let i = 0; i < arr.length; i++) {
-      setPointers({ i }); setActiveIndices([i]);
-      const s = arr[i];
+      const str = arr[i];
+      pushState(arr, map, { i }, [i], proc, {}, `Processing string "${str}"`);
       
-      const key = s.split('').sort().join('');
-      setVariables({ Word: s, SortedKey: key });
-      addStep(`Sorted '${s}' to get key '${key}'.`);
-      await sleep(speed * 1.5, signal);
+      const key = str.split('').sort().join('');
+      pushState(arr, map, { i }, [i], proc, { SortedKey: key }, `Sorted representation: "${key}"`);
       
-      clearHashActive();
-      if (!map[key]) {
-        map[key] = [s];
-        addStep(`Key '${key}' not found. Creating new list.`);
-      } else {
-        map[key].push(s);
-        addStep(`Key '${key}' found. Appending '${s}' to list.`);
-      }
-      updateHash(key, `[${map[key].join(', ')}]`, true);
-      await sleep(speed * 1.5, signal);
+      if (!map[key]) map[key] = [];
+      map[key].push(str);
+      proc.push(i);
+      
+      pushState(arr, map, { i }, [i], proc, { SortedKey: key }, `Grouped "${str}" under key "${key}"`);
     }
-    clearHashActive();
-    setResult(JSON.stringify(Object.values(map)));
+    pushState(arr, map, {}, [], proc, { TotalGroups: Object.keys(map).length }, `✅ Grouping complete.`);
   };
 
-  // --- Render Helpers ---
+
+  // --- Playback Controls ---
+  const handlePlayPause = () => { if (trace.length === 0) executeAlgo(); else setIsPlaying(!isPlaying); };
+  const handleNext = () => { setIsPlaying(false); if (currentStep < trace.length - 1) setCurrentStep(c => c + 1); };
+  const handlePrev = () => { setIsPlaying(false); if (currentStep > 0) setCurrentStep(c => c - 1); };
+
+  // --- Rendering ---
+  const currentState = trace[currentStep] || { inputArr: getInitialData(), hashMap: {}, pointers: {}, activeInput: [], processedInput: [], variables: {}, msg: 'Ready.' };
+  const historySteps = trace.slice(0, currentStep + 1).map(t => t.msg).filter(m => m);
+
+  const renderArrayHorizontal = (arr, title, activeIndices, processedIndices, pointersObj) => {
+    if (!arr || arr.length === 0) return null;
+    return (
+      <div style={{ marginBottom: '2rem' }}>
+        <div style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '1px' }}>{title}</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', justifyContent: 'center' }}>
+          {arr.map((val, idx) => {
+            const isActive = activeIndices.includes(idx);
+            const isProcessed = processedIndices.includes(idx);
+            
+            let bg = 'rgba(255,255,255,0.05)', border = '1px solid rgba(255,255,255,0.1)', color = 'var(--text-muted)', shadow = 'none';
+            if (isActive) { bg = 'var(--active-accent)'; border = '1px solid var(--active-accent)'; color = '#000'; shadow = '0 0 15px var(--active-accent)'; }
+            else if (isProcessed) { bg = 'rgba(0,255,136,0.1)'; border = '1px solid rgba(0,255,136,0.3)'; color = '#00ff88'; }
+
+            const myPointers = Object.entries(pointersObj).filter(([_, p]) => p === idx);
+
+            return (
+              <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <div style={{ height: '20px', display: 'flex', gap: '2px', alignItems: 'flex-end', marginBottom: '4px' }}>
+                  {myPointers.map(([pName]) => <div key={pName} style={{ background: '#ff00ff', color: '#fff', fontSize: '0.55rem', padding: '2px 4px', borderRadius: '4px' }}>{pName}↓</div>)}
+                </div>
+                <div style={{ minWidth: '40px', padding: '0 8px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: bg, border, borderRadius: '6px', color, fontSize: '1.1rem', fontWeight: isActive ? 'bold' : 'normal', boxShadow: shadow, fontFamily: 'Fira Code, monospace' }}>
+                  {val}
+                </div>
+                <div style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.3)', marginTop: '4px' }}>{idx}</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  const renderHashMap = (map) => {
+    const entries = Object.entries(map);
+    if (entries.length === 0) return null;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', marginTop: '1rem' }}>
+        <div style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Hash Map / Set State</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '8px', width: '100%', maxWidth: '600px' }}>
+          {entries.map(([k, v]) => (
+            <div key={k} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--panel-border)', borderRadius: '6px', padding: '6px 12px' }}>
+              <span style={{ color: 'var(--active-accent)', fontFamily: 'Fira Code, monospace', fontSize: '0.9rem' }}>{k}</span>
+              <span style={{ color: '#fff', fontSize: '0.8rem', fontFamily: 'monospace' }}>{Array.isArray(v) ? `[${v.join(', ')}]` : v}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div style={{ display: 'flex', gap: '1rem', width: '100%', height: '100%' }}>
@@ -301,93 +291,59 @@ const HashVisualizer = ({ algorithmId }) => {
         
         {/* Controls */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem', flexShrink: 0 }}>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <button onClick={() => { setMode('auto'); reset(); }} style={{ padding: '0.25rem 0.65rem', borderRadius: '4px', border: '1px solid var(--panel-border)', background: mode === 'auto' ? 'var(--active-accent)' : 'transparent', color: mode === 'auto' ? '#000' : '#fff', cursor: 'pointer', fontSize: '0.8rem' }}>Auto</button>
-            <button onClick={() => setMode('custom')} style={{ padding: '0.25rem 0.65rem', borderRadius: '4px', border: '1px solid var(--panel-border)', background: mode === 'custom' ? 'var(--active-accent)' : 'transparent', color: mode === 'custom' ? '#000' : '#fff', cursor: 'pointer', fontSize: '0.8rem' }}>Custom</button>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button onClick={() => { setMode('auto'); initData(); setTimeout(executeAlgo, 100); }}
+              style={{ padding: '0.25rem 0.65rem', borderRadius: '4px', border: '1px solid var(--panel-border)', background: mode === 'auto' ? 'var(--active-accent)' : 'transparent', color: mode === 'auto' ? '#000' : '#fff', cursor: 'pointer', fontSize: '0.8rem' }}>
+              Auto Demo
+            </button>
+            <button onClick={() => setMode('custom')}
+              style={{ padding: '0.25rem 0.65rem', borderRadius: '4px', border: '1px solid var(--panel-border)', background: mode === 'custom' ? 'var(--active-accent)' : 'transparent', color: mode === 'custom' ? '#000' : '#fff', cursor: 'pointer', fontSize: '0.8rem' }}>
+              Custom
+            </button>
             {mode === 'custom' && (
               <>
-                <input type="text" placeholder="e.g. 1, 2, 3" value={customInput} onChange={e => setCustomInput(e.target.value)} style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid var(--panel-border)', color: '#fff', padding: '0.25rem 0.5rem', borderRadius: '4px', width: '150px', fontSize: '0.8rem' }} />
-                <button onClick={applyCustom} style={{ padding: '0.25rem 0.6rem', borderRadius: '4px', border: '1px solid var(--active-accent)', background: 'transparent', color: '#fff', cursor: 'pointer', fontSize: '0.8rem' }}>Apply</button>
+                <input type="text" placeholder="e.g. 2,1,2,3 or eat,tea" value={customInputA}
+                  onChange={e => setCustomInputA(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && applyCustom()}
+                  style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid var(--panel-border)', color: '#fff', padding: '0.25rem 0.5rem', borderRadius: '4px', width: '130px', fontSize: '0.8rem' }} />
+                <button onClick={applyCustom}
+                  style={{ padding: '0.25rem 0.6rem', borderRadius: '4px', border: '1px solid var(--active-accent)', background: 'transparent', color: '#fff', cursor: 'pointer', fontSize: '0.8rem' }}>
+                  Apply
+                </button>
               </>
             )}
             <div style={{ width: '1px', height: '20px', background: 'rgba(255,255,255,0.15)', margin: '0 4px' }} />
-            <input type="range" min="20" max="600" value={600 - speed + 20} onChange={e => setSpeed(600 - parseInt(e.target.value) + 20)} style={{ width: '80px', accentColor: 'var(--active-accent)' }} />
+            <div style={{ display: 'flex', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--panel-border)', borderRadius: '4px', overflow: 'hidden' }}>
+              <button onClick={handlePrev} disabled={currentStep === 0 || trace.length === 0} style={{ padding: '0.25rem 0.5rem', background: 'transparent', border: 'none', borderRight: '1px solid var(--panel-border)', color: '#fff', cursor: 'pointer', opacity: currentStep === 0 ? 0.3 : 1 }}>⏮</button>
+              <button onClick={handlePlayPause} style={{ padding: '0.25rem 0.75rem', background: isPlaying ? 'rgba(255,255,255,0.1)' : 'transparent', border: 'none', color: 'var(--active-accent)', fontWeight: 'bold', cursor: 'pointer', width: '60px' }}>{isPlaying ? '⏸' : '▶️'}</button>
+              <button onClick={handleNext} disabled={currentStep >= trace.length - 1} style={{ padding: '0.25rem 0.5rem', background: 'transparent', border: 'none', borderLeft: '1px solid var(--panel-border)', color: '#fff', cursor: 'pointer', opacity: currentStep >= trace.length - 1 ? 0.3 : 1 }}>⏭</button>
+            </div>
+            <input type="range" min="100" max="1500" value={1500 - speed + 100} onChange={e => setSpeed(1500 - parseInt(e.target.value) + 100)} style={{ width: '80px', accentColor: 'var(--active-accent)' }} />
           </div>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button onClick={reset} disabled={isRunning} style={{ background: 'transparent', border: '1px solid var(--panel-border)', color: '#fff', padding: '0.35rem 0.8rem', borderRadius: '4px', cursor: isRunning ? 'not-allowed' : 'pointer', opacity: isRunning ? 0.5 : 1, fontSize: '0.8rem' }}>Reset</button>
-            <button onClick={isRunning ? abort : execute} style={{ background: isRunning ? '#ff4444' : 'var(--active-accent)', border: 'none', color: '#000', fontWeight: 'bold', padding: '0.35rem 1.2rem', borderRadius: '4px', cursor: 'pointer', boxShadow: '0 0 10px var(--active-accent)', fontSize: '0.8rem' }}>{isRunning ? 'Stop' : 'Execute'}</button>
+            <button onClick={initData} style={{ background: 'transparent', border: '1px solid var(--panel-border)', color: '#fff', padding: '0.35rem 0.8rem', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>Reset</button>
           </div>
         </div>
 
-        {/* Input Array Display */}
-        {inputArray.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', justifyContent: 'center', marginBottom: '2rem' }}>
-            {inputArray.map((val, idx) => (
-              <div key={idx} style={{
-                position: 'relative', height: '35px', minWidth: '35px', padding: '0 8px',
-                background: activeIndices.includes(idx) ? 'var(--active-accent)' : 'rgba(255,255,255,0.05)',
-                border: activeIndices.includes(idx) ? '1px solid var(--active-accent)' : '1px solid rgba(255,255,255,0.1)',
-                borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: activeIndices.includes(idx) ? '#000' : 'var(--text-muted)', fontFamily: 'monospace'
-              }}>
-                {val}
-                {Object.entries(pointers).find(([_, pIdx]) => pIdx === idx) && (
-                  <div style={{ position: 'absolute', top: '-15px', color: '#ff00ff', fontSize: '0.6rem', fontWeight: 'bold' }}>↓</div>
-                )}
+        {/* Variables Tracker */}
+        {Object.keys(currentState.variables).length > 0 && (
+          <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', padding: '0.75rem', background: 'rgba(0,0,0,0.3)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap' }}>
+            {Object.entries(currentState.variables).map(([key, val]) => (
+              <div key={key} style={{ display: 'flex', flexDirection: 'column' }}>
+                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>{key}</span>
+                <span style={{ fontSize: '1.1rem', fontWeight: 'bold', color: 'var(--active-accent)', fontFamily: 'Fira Code, monospace' }}>{val}</span>
               </div>
             ))}
           </div>
         )}
 
-        {/* Variables & Result */}
-        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-          {Object.keys(variables).length > 0 && (
-            <div style={{ display: 'flex', gap: '1rem', padding: '0.75rem', background: 'rgba(0,0,0,0.3)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap', flex: 1 }}>
-              {Object.entries(variables).map(([key, val]) => (
-                <div key={key} style={{ display: 'flex', flexDirection: 'column' }}>
-                  <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{key}</span>
-                  <span style={{ fontSize: '1rem', fontWeight: 'bold', color: 'var(--active-accent)', fontFamily: 'monospace' }}>{val}</span>
-                </div>
-              ))}
-            </div>
-          )}
-          {result !== null && (
-            <div style={{ padding: '0.75rem', background: 'rgba(0, 255, 136, 0.1)', borderRadius: '6px', border: '1px solid #00ff88', color: '#00ff88', display: 'flex', flexDirection: 'column', minWidth: '150px' }}>
-              <span style={{ fontSize: '0.65rem', textTransform: 'uppercase' }}>Result</span>
-              <span style={{ fontSize: '1.1rem', fontWeight: 'bold', fontFamily: 'monospace' }}>{result}</span>
-            </div>
-          )}
-        </div>
-
-        {/* Hash Map Table Area */}
-        <div style={{ flex: 1, display: 'flex', justifyContent: 'center', overflowY: 'auto' }}>
-          <div style={{ minWidth: '300px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.2)', paddingBottom: '8px', marginBottom: '8px' }}>
-              <div style={{ flex: 1, color: 'var(--text-muted)', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.8rem' }}>Key</div>
-              <div style={{ flex: 1, color: 'var(--text-muted)', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.8rem' }}>Value</div>
-            </div>
-            {Object.keys(hashMap).length === 0 ? (
-              <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.2)', marginTop: '20px' }}>Map is Empty</div>
-            ) : (
-              Object.entries(hashMap).map(([key, obj]) => (
-                <div key={key} style={{
-                  display: 'flex', 
-                  background: obj.active ? 'rgba(0, 255, 136, 0.2)' : 'rgba(255,255,255,0.05)',
-                  border: obj.active ? '1px solid #00ff88' : '1px solid transparent',
-                  borderRadius: '4px',
-                  padding: '8px 12px',
-                  transition: 'all 0.2s ease',
-                  boxShadow: obj.active ? '0 0 10px rgba(0, 255, 136, 0.2)' : 'none'
-                }}>
-                  <div style={{ flex: 1, color: obj.active ? '#00ff88' : '#fff', fontFamily: 'monospace', fontWeight: 'bold' }}>{key}</div>
-                  <div style={{ flex: 1, color: obj.active ? '#00ff88' : 'var(--text-muted)', fontFamily: 'monospace' }}>{obj.val}</div>
-                </div>
-              ))
-            )}
-          </div>
+        {/* Visualization Area */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto', padding: '1rem' }}>
+          {renderArrayHorizontal(currentState.inputArr, 'Input Data', currentState.activeInput, currentState.processedInput, currentState.pointers)}
+          {renderHashMap(currentState.hashMap)}
         </div>
       </div>
-      <StepLog steps={steps} currentStep={steps.length - 1} />
+      <StepLog steps={historySteps} currentStep={currentStep} />
     </div>
   );
 };

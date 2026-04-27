@@ -2,512 +2,440 @@ import React, { useState, useEffect, useRef } from 'react';
 import StepLog from './StepLog';
 
 const StackQueueVisualizer = ({ algorithmId }) => {
-  // We can render multiple stacks or queues
-  const [structures, setStructures] = useState({ 
-    main: { type: 'stack', data: [] } 
-  });
-  
-  // For algorithms that process an input string/array while using a stack/queue
-  const [inputArray, setInputArray] = useState([]);
-  
   const [speed, setSpeed] = useState(300);
   const [mode, setMode] = useState('auto');
-  const [customInput, setCustomInput] = useState('');
-  
-  const [isRunning, setIsRunning] = useState(false);
+  const [customInputA, setCustomInputA] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
-  
-  // Visualization State
-  const [steps, setSteps] = useState([]);
-  const [pointers, setPointers] = useState({});
-  const [activeIndices, setActiveIndices] = useState([]); // for input array
-  const [variables, setVariables] = useState({});
 
-  const abortController = useRef(null);
+  // --- Snapshot Animation Engine State ---
+  const [trace, setTrace] = useState([]);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   useEffect(() => {
-    reset();
+    initData();
   }, [algorithmId]);
 
-  const reset = () => {
-    if (abortController.current) abortController.current.abort();
-    generateData();
-    setIsRunning(false);
-    setSteps([]); setPointers({}); setActiveIndices([]); setVariables({});
-    setErrorMsg('');
-  };
+  useEffect(() => {
+    let timer;
+    if (isPlaying && currentStep < trace.length - 1) {
+      timer = setTimeout(() => {
+        setCurrentStep(prev => prev + 1);
+      }, speed);
+    } else if (currentStep >= trace.length - 1 && trace.length > 0) {
+      setIsPlaying(false);
+    }
+    return () => clearTimeout(timer);
+  }, [isPlaying, currentStep, trace, speed]);
 
-  const generateData = () => {
-    if (mode === 'custom' && customInput) {
-      if (algorithmId === 'valid_parens' || algorithmId === 'infix_postfix') {
-        setInputArray(customInput.split(''));
-      } else {
-        setInputArray(customInput.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n)));
-      }
-      return;
-    }
-    
-    if (algorithmId === 'valid_parens') {
-      setInputArray("()[]{}".split(''));
-      setStructures({ main: { type: 'stack', data: [] } });
-    } else if (algorithmId === 'next_greater' || algorithmId === 'prev_greater') {
-      setInputArray([4, 12, 5, 3, 1, 2, 5, 3, 1, 2, 4, 6]);
-      setStructures({ main: { type: 'stack', data: [] }, result: { type: 'array', data: [] } });
-    } else if (algorithmId === 'min_stack') {
-      setInputArray([]); // operations driven
-      setStructures({ main: { type: 'stack', data: [] }, minMap: { type: 'stack', data: [] } });
-    } else if (algorithmId === 'queue_using_stack') {
-      setInputArray([]);
-      setStructures({ inStack: { type: 'stack', data: [] }, outStack: { type: 'stack', data: [] } });
-    } else if (algorithmId === 'circular_queue') {
-      setInputArray([]);
-      setStructures({ main: { type: 'queue', data: new Array(5).fill(null), max: 5 } });
-    } else if (algorithmId === 'largest_rectangle') {
-      setInputArray([2, 1, 5, 6, 2, 3]);
-      setStructures({ main: { type: 'stack', data: [] } });
-    } else if (algorithmId === 'infix_postfix') {
-      setInputArray("A*(B+C)/D".split(''));
-      setStructures({ main: { type: 'stack', data: [] }, result: { type: 'array', data: [] } });
-    } else {
-      setInputArray([1, 2, 3, 4, 5]);
-      setStructures({ main: { type: 'stack', data: [] } });
-    }
+  const initData = () => {
+    setIsPlaying(false);
+    setTrace([]);
+    setCurrentStep(0);
+    setErrorMsg('');
   };
 
   const applyCustom = () => {
-    if (!customInput) return;
-    setErrorMsg('');
-    reset();
-    if (algorithmId === 'valid_parens' || algorithmId === 'infix_postfix') {
-      setInputArray(customInput.split(''));
-    } else {
-      setInputArray(customInput.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n)));
-    }
+    if (!customInputA.trim()) return;
+    initData();
   };
 
-  const sleep = (ms, signal) => {
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(resolve, ms);
-      signal.addEventListener('abort', () => {
-        clearTimeout(timeout);
-        reject(new DOMException('Aborted', 'AbortError'));
-      });
-    });
-  };
-
-  const addStep = (msg) => setSteps(prev => [...prev, msg]);
-
-  const execute = async () => {
-    if (isRunning) return;
-    setIsRunning(true);
-    setSteps([]); setPointers({}); setActiveIndices([]); setVariables({});
-    
-    abortController.current = new AbortController();
-    const signal = abortController.current.signal;
-
-    try {
-      const arr = [...inputArray];
-      switch (algorithmId) {
-        case 'valid_parens': await runValidParens(arr, signal); break;
-        case 'next_greater': await runNextGreater(arr, signal); break;
-        case 'prev_greater': await runPrevGreater(arr, signal); break;
-        case 'largest_rectangle': await runHistogram(arr, signal); break;
-        case 'min_stack': await runMinStack(signal); break;
-        case 'queue_using_stack': await runQueueUsingStack(signal); break;
-        case 'circular_queue': await runCircularQueue(signal); break;
-        case 'infix_postfix': await runInfixPostfix(arr, signal); break;
-        default: addStep(`Logic for ${algorithmId} coming soon.`);
+  const getInitialData = () => {
+    if (mode === 'custom' && customInputA) {
+      if (algorithmId === 'valid_parens' || algorithmId === 'infix_postfix') {
+        return customInputA.split('');
+      } else {
+        return customInputA.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
       }
-      if (!signal.aborted) addStep('Algorithm complete.');
-    } catch (err) {
-      if (err.name !== 'AbortError') console.error(err);
-      addStep('Execution stopped.');
-    } finally {
-      setIsRunning(false);
+    }
+    
+    switch (algorithmId) {
+      case 'valid_parens': return "({[]})".split('');
+      case 'largest_rectangle': return [2, 1, 5, 6, 2, 3];
+      case 'infix_postfix': return "A+B*C".split('');
+      case 'sliding_window_max': return [1, 3, -1, -3, 5, 3, 6, 7];
+      case 'next_greater':
+      case 'prev_greater': return [4, 5, 2, 10, 8];
+      case 'min_stack':
+      case 'queue_using_stack':
+      case 'stack_using_queue':
+      case 'circular_queue':
+        return [10, 20, 30, 40, 50]; // Represents sequence of items to Push/Enqueue
+      default: return [1, 2, 3, 4, 5];
     }
   };
 
-  const abort = () => { if (abortController.current) abortController.current.abort(); };
+  const executeAlgo = () => {
+    if (trace.length > 0 && currentStep === 0) { setIsPlaying(true); return; }
+    if (currentStep > 0 && currentStep < trace.length - 1) { setIsPlaying(true); return; }
+    if (currentStep >= trace.length - 1 && trace.length > 0) { setCurrentStep(0); setIsPlaying(true); return; }
 
-  // --- Algorithm Implementations ---
+    const inputData = getInitialData();
+    const newTrace = [];
+    
+    // Arrays for visualization:
+    // primary: usually the stack or main queue
+    // secondary: second stack/queue or result array
+    // inputData: the array being processed
+    const pushState = (primary, secondary, inputArr, ptrs={}, actInput=[], actPrimary=[], actSecondary=[], vars={}, msg='') => {
+      newTrace.push({
+        primary: [...primary],
+        secondary: [...secondary],
+        inputArr: [...inputArr],
+        pointers: { ...ptrs },
+        activeInput: [...actInput],
+        activePrimary: [...actPrimary],
+        activeSecondary: [...actSecondary],
+        variables: { ...vars },
+        msg
+      });
+    };
 
-  const runValidParens = async (arr, signal) => {
-    addStep('Valid Parentheses: Use stack to track open brackets.');
+    pushState([], [], inputData, {}, [], [], [], {}, `Starting ${algorithmId.replaceAll('_', ' ')}...`);
+
+    const arr = [...inputData];
+
+    switch (algorithmId) {
+      case 'next_greater': runNextGreater(arr, pushState); break;
+      case 'prev_greater': runPrevGreater(arr, pushState); break;
+      case 'valid_parens': runValidParens(arr, pushState); break;
+      case 'largest_rectangle': runLargestRectangle(arr, pushState); break;
+      case 'min_stack': runMinStack(arr, pushState); break;
+      case 'infix_postfix': runInfixPostfix(arr, pushState); break;
+      case 'queue_using_stack': runQueueUsingStack(arr, pushState); break;
+      case 'stack_using_queue': runStackUsingQueue(arr, pushState); break;
+      case 'sliding_window_max': runSlidingWindowMax(arr, pushState); break;
+      case 'circular_queue': runCircularQueue(arr, pushState); break;
+      default: pushState([], [], arr, {}, [], [], [], {}, `Logic for ${algorithmId} pending.`); break;
+    }
+
+    if (newTrace.length === 1) pushState([], [], arr, {}, [], [], [], {}, 'Finished.');
+
+    setTrace(newTrace);
+    setCurrentStep(0);
+    setIsPlaying(true);
+  };
+
+  // --- Algorithms ---
+
+  const runNextGreater = (arr, pushState) => {
+    const stack = []; // will store indices
+    const res = new Array(arr.length).fill(-1);
+    
+    for (let i = 0; i < arr.length; i++) {
+      pushState(stack.map(idx => arr[idx]), res, arr, { i }, [i], [], [], { Result: JSON.stringify(res) }, `Processing element ${arr[i]} at index ${i}`);
+      
+      while (stack.length > 0 && arr[stack[stack.length - 1]] < arr[i]) {
+        const topIdx = stack.pop();
+        res[topIdx] = arr[i];
+        pushState(stack.map(idx => arr[idx]), res, arr, { i }, [i, topIdx], [stack.length], [topIdx], { Result: JSON.stringify(res) }, `Found next greater for ${arr[topIdx]}: ${arr[i]}. Popping stack.`);
+      }
+      
+      stack.push(i);
+      pushState(stack.map(idx => arr[idx]), res, arr, { i }, [i], [stack.length - 1], [], { Result: JSON.stringify(res) }, `Pushing ${arr[i]} to stack.`);
+    }
+    pushState(stack.map(idx => arr[idx]), res, arr, {}, [], [], [], { FinalResult: JSON.stringify(res) }, `✅ Next Greater Element complete.`);
+  };
+
+  const runPrevGreater = (arr, pushState) => {
+    const stack = []; 
+    const res = new Array(arr.length).fill(-1);
+    
+    for (let i = 0; i < arr.length; i++) {
+      pushState(stack.map(idx => arr[idx]), res, arr, { i }, [i], [], [], { Result: JSON.stringify(res) }, `Processing element ${arr[i]}`);
+      
+      while (stack.length > 0 && arr[stack[stack.length - 1]] <= arr[i]) {
+        const popped = stack.pop();
+        pushState(stack.map(idx => arr[idx]), res, arr, { i }, [i], [stack.length], [], { Result: JSON.stringify(res) }, `${arr[popped]} <= ${arr[i]}. Popping stack.`);
+      }
+      
+      if (stack.length > 0) {
+        res[i] = arr[stack[stack.length - 1]];
+        pushState(stack.map(idx => arr[idx]), res, arr, { i }, [i], [stack.length - 1], [i], { Result: JSON.stringify(res) }, `Previous greater for ${arr[i]} is ${res[i]}.`);
+      } else {
+        pushState(stack.map(idx => arr[idx]), res, arr, { i }, [i], [], [i], { Result: JSON.stringify(res) }, `Stack empty. No previous greater for ${arr[i]}.`);
+      }
+      
+      stack.push(i);
+      pushState(stack.map(idx => arr[idx]), res, arr, { i }, [i], [stack.length - 1], [], { Result: JSON.stringify(res) }, `Pushing ${arr[i]} to stack.`);
+    }
+    pushState(stack.map(idx => arr[idx]), res, arr, {}, [], [], [], { FinalResult: JSON.stringify(res) }, `✅ Previous Greater Element complete.`);
+  };
+
+  const runValidParens = (arr, pushState) => {
     const stack = [];
     const map = { ')': '(', '}': '{', ']': '[' };
     
     for (let i = 0; i < arr.length; i++) {
-      setPointers({ i }); setActiveIndices([i]);
       const c = arr[i];
+      pushState(stack, [], arr, { i }, [i], [], [], {}, `Checking '${c}'`);
       
-      if ('([{'.includes(c)) {
-        addStep(`Found open bracket '${c}'. Pushing to stack.`);
+      if (['(', '{', '['].includes(c)) {
         stack.push(c);
-        setStructures({ main: { type: 'stack', data: [...stack] } });
-        await sleep(speed, signal);
+        pushState(stack, [], arr, { i }, [i], [stack.length - 1], [], {}, `Pushed '${c}' to stack.`);
       } else {
         if (stack.length === 0) {
-          addStep(`Found closing bracket '${c}' but stack is empty. Invalid!`);
+          pushState(stack, [], arr, { i }, [i], [], [], {}, `❌ Stack is empty but found closing '${c}'. Invalid!`);
           return;
         }
-        const top = stack[stack.length - 1];
-        if (map[c] === top) {
-          addStep(`Closing bracket '${c}' matches top '${top}'. Popping stack.`);
-          stack.pop();
-          setStructures({ main: { type: 'stack', data: [...stack] } });
-          await sleep(speed, signal);
-        } else {
-          addStep(`Closing bracket '${c}' does NOT match top '${top}'. Invalid!`);
-          return;
-        }
-      }
-    }
-    
-    if (stack.length === 0) addStep('String is fully processed and stack is empty. Valid!');
-    else addStep('String processed but stack is not empty. Invalid!');
-  };
-
-  const runNextGreater = async (arr, signal) => {
-    addStep('Next Greater Element: Using a Monotonic Decreasing Stack.');
-    const res = new Array(arr.length).fill(-1);
-    const stack = []; // will store indices
-    
-    setStructures({ main: { type: 'stack', data: [] }, result: { type: 'array', data: [...res] } });
-
-    for (let i = 0; i < arr.length; i++) {
-      setPointers({ i }); setActiveIndices([i]);
-      addStep(`Processing arr[${i}] = ${arr[i]}`);
-      await sleep(speed, signal);
-      
-      while (stack.length > 0 && arr[stack[stack.length - 1]] < arr[i]) {
-        const poppedIdx = stack.pop();
-        addStep(`arr[${i}] (${arr[i]}) > arr[${poppedIdx}] (${arr[poppedIdx]}). Next Greater Element for ${arr[poppedIdx]} is ${arr[i]}.`);
-        res[poppedIdx] = arr[i];
+        const top = stack.pop();
+        pushState(stack, [], arr, { i }, [i], [stack.length], [], {}, `Popped '${top}' for comparison with '${c}'`);
         
-        setStructures({ 
-          main: { type: 'stack', data: stack.map(idx => arr[idx]) }, 
-          result: { type: 'array', data: [...res] } 
-        });
-        await sleep(speed, signal);
+        if (map[c] !== top) {
+          pushState(stack, [], arr, { i }, [i], [], [], {}, `❌ Mismatch! Expected '${map[c]}' but found '${top}'. Invalid!`);
+          return;
+        }
+        pushState(stack, [], arr, { i }, [i], [], [], {}, `✅ Match found.`);
       }
-      
-      addStep(`Pushing index ${i} (value ${arr[i]}) to stack.`);
-      stack.push(i);
-      setStructures({ 
-        main: { type: 'stack', data: stack.map(idx => arr[idx]) }, 
-        result: { type: 'array', data: [...res] } 
-      });
-      await sleep(speed, signal);
     }
+    
+    if (stack.length === 0) pushState(stack, [], arr, {}, [], [], [], {}, `✅ Stack empty. Parentheses are Valid!`);
+    else pushState(stack, [], arr, {}, [], [], [], {}, `❌ Stack not empty. Unmatched opening parentheses remain.`);
   };
 
-  const runPrevGreater = async (arr, signal) => {
-    addStep('Previous Greater Element: Monotonic Decreasing Stack.');
-    const res = new Array(arr.length).fill(-1);
-    const stack = []; 
-    
-    setStructures({ main: { type: 'stack', data: [] }, result: { type: 'array', data: [...res] } });
-
-    for (let i = 0; i < arr.length; i++) {
-      setPointers({ i }); setActiveIndices([i]);
-      addStep(`Processing arr[${i}] = ${arr[i]}`);
-      await sleep(speed, signal);
-      
-      while (stack.length > 0 && stack[stack.length - 1] <= arr[i]) {
-        const popped = stack.pop();
-        addStep(`arr[${i}] (${arr[i]}) >= top (${popped}). Popping ${popped}.`);
-        setStructures({ main: { type: 'stack', data: [...stack] }, result: { type: 'array', data: [...res] } });
-        await sleep(speed, signal);
-      }
-      
-      if (stack.length > 0) {
-        res[i] = stack[stack.length - 1];
-        addStep(`Top of stack is ${res[i]}. Previous Greater for ${arr[i]} is ${res[i]}.`);
-      } else {
-        addStep(`Stack is empty. No Previous Greater for ${arr[i]}.`);
-      }
-      
-      stack.push(arr[i]);
-      setStructures({ main: { type: 'stack', data: [...stack] }, result: { type: 'array', data: [...res] } });
-      await sleep(speed, signal);
-    }
-  };
-
-  const runMinStack = async (signal) => {
-    addStep('Min Stack operations simulation.');
-    const ops = [
-      { type: 'push', val: -2 },
-      { type: 'push', val: 0 },
-      { type: 'push', val: -3 },
-      { type: 'getMin', val: -3 },
-      { type: 'pop' },
-      { type: 'top', val: 0 },
-      { type: 'getMin', val: -2 }
-    ];
-    
-    const stack = [];
-    
-    for (const op of ops) {
-      addStep(`Executing ${op.type}(${op.val !== undefined ? op.val : ''})`);
-      await sleep(speed, signal);
-      
-      if (op.type === 'push') {
-        const currentMin = stack.length > 0 ? stack[stack.length - 1].min : Infinity;
-        const newMin = Math.min(op.val, currentMin);
-        stack.push({ val: op.val, min: newMin });
-        addStep(`Pushed ${op.val}. New Min is ${newMin}`);
-      } else if (op.type === 'pop') {
-        stack.pop();
-        addStep(`Popped top element.`);
-      } else if (op.type === 'getMin') {
-        addStep(`Current Min is ${stack[stack.length - 1].min}`);
-      } else if (op.type === 'top') {
-        addStep(`Top element is ${stack[stack.length - 1].val}`);
-      }
-      
-      setStructures({ 
-        main: { type: 'stack', data: stack.map(s => s.val) }, 
-        minMap: { type: 'stack', data: stack.map(s => s.min) } 
-      });
-      await sleep(speed * 1.5, signal);
-    }
-  };
-
-  const runHistogram = async (arr, signal) => {
-    addStep('Largest Rectangle in Histogram (Monotonic Increasing Stack).');
-    const stack = [];
+  const runLargestRectangle = (arr, pushState) => {
+    const stack = []; // stores indices
     let maxArea = 0;
-    const heights = [...arr, 0]; // append 0 to flush remaining
+    let i = 0;
     
-    setStructures({ main: { type: 'stack', data: [] } });
-
-    for (let i = 0; i < heights.length; i++) {
-      setPointers({ i }); setActiveIndices([i]);
+    while (i < arr.length) {
+      pushState(stack.map(idx => `${arr[idx]}(idx:${idx})`), [], arr, { i }, [i], [], [], { MaxArea: maxArea }, `Checking bar of height ${arr[i]} at index ${i}`);
       
-      while (stack.length > 0 && heights[stack[stack.length - 1]] > heights[i]) {
-        const poppedIdx = stack.pop();
-        const h = heights[poppedIdx];
-        const w = stack.length === 0 ? i : i - stack[stack.length - 1] - 1;
-        const area = h * w;
+      if (stack.length === 0 || arr[stack[stack.length - 1]] <= arr[i]) {
+        stack.push(i);
+        pushState(stack.map(idx => `${arr[idx]}(idx:${idx})`), [], arr, { i }, [i], [stack.length - 1], [], { MaxArea: maxArea }, `Pushing index ${i} to stack.`);
+        i++;
+      } else {
+        const topIdx = stack.pop();
+        const height = arr[topIdx];
+        const width = stack.length === 0 ? i : i - stack[stack.length - 1] - 1;
+        const area = height * width;
         maxArea = Math.max(maxArea, area);
         
-        addStep(`Popped height ${h}. Width = ${w}. Area = ${area}. MaxArea = ${maxArea}`);
-        setVariables({ maxArea, lastArea: area, h, w });
-        setStructures({ main: { type: 'stack', data: stack.map(idx => heights[idx]) } });
-        await sleep(speed * 1.5, signal);
+        pushState(stack.map(idx => `${arr[idx]}(idx:${idx})`), [], arr, { i }, [topIdx], [stack.length], [], { MaxArea: maxArea, AreaCalculated: `${height} * ${width} = ${area}` }, `Popped index ${topIdx} (height ${height}). Area = ${area}`);
       }
-      
-      if (i < arr.length) addStep(`Pushing height ${heights[i]} to stack.`);
-      stack.push(i);
-      setStructures({ main: { type: 'stack', data: stack.map(idx => heights[idx]) } });
-      await sleep(speed, signal);
     }
+    
+    while (stack.length > 0) {
+      const topIdx = stack.pop();
+      const height = arr[topIdx];
+      const width = stack.length === 0 ? i : i - stack[stack.length - 1] - 1;
+      const area = height * width;
+      maxArea = Math.max(maxArea, area);
+      pushState(stack.map(idx => `${arr[idx]}(idx:${idx})`), [], arr, {}, [topIdx], [stack.length], [], { MaxArea: maxArea, AreaCalculated: `${height} * ${width} = ${area}` }, `Emptying stack. Popped index ${topIdx}. Area = ${area}`);
+    }
+    
+    pushState([], [], arr, {}, [], [], [], { FinalMaxArea: maxArea }, `✅ Largest Rectangle Area is ${maxArea}`);
   };
 
-  const runQueueUsingStack = async (signal) => {
-    addStep('Queue using Two Stacks (Amortized O(1) Dequeue)');
-    const ops = ['push(1)', 'push(2)', 'peek()', 'pop()', 'isEmpty()'];
-    setInputArray(ops);
+  const runMinStack = (arr, pushState) => {
+    const stack = [];
+    const minStack = [];
     
-    let inSt = [];
-    let outSt = [];
-    
-    for (let i=0; i<ops.length; i++) {
-      const op = ops[i];
-      setPointers({ i }); setActiveIndices([i]);
-      addStep(`Executing ${op}`);
-      await sleep(speed, signal);
+    for (let i = 0; i < arr.length; i++) {
+      const val = arr[i];
+      pushState(stack, minStack, arr, { i }, [i], [], [], {}, `Pushing ${val}`);
       
-      if (op.startsWith('push')) {
-        const val = parseInt(op.match(/\d+/)[0]);
-        inSt.push(val);
-        addStep(`Pushed ${val} to InStack`);
-      } else if (op.startsWith('pop') || op.startsWith('peek')) {
-        if (outSt.length === 0) {
-          addStep(`OutStack is empty. Transferring all elements from InStack to OutStack.`);
-          while(inSt.length > 0) {
-            outSt.push(inSt.pop());
-            setStructures({ inStack: { type: 'stack', data: [...inSt] }, outStack: { type: 'stack', data: [...outSt] } });
-            await sleep(speed * 0.5, signal);
-          }
-        }
-        if (op.startsWith('pop')) {
-          const val = outSt.pop();
-          addStep(`Popped ${val} from OutStack`);
-        } else {
-          addStep(`Peeked ${outSt[outSt.length - 1]} from OutStack`);
-        }
-      }
-      setStructures({ inStack: { type: 'stack', data: [...inSt] }, outStack: { type: 'stack', data: [...outSt] } });
-      await sleep(speed * 1.5, signal);
-    }
-  };
-
-  const runCircularQueue = async (signal) => {
-    const k = 5;
-    addStep(`Circular Queue (Size ${k})`);
-    
-    const data = new Array(k).fill(null);
-    let head = -1, tail = -1;
-    
-    const ops = [
-      { t: 'enQ', v: 10 }, { t: 'enQ', v: 20 }, { t: 'enQ', v: 30 }, { t: 'enQ', v: 40 },
-      { t: 'deQ' }, { t: 'deQ' }, { t: 'enQ', v: 50 }, { t: 'enQ', v: 60 }, { t: 'enQ', v: 70 } // 70 should wrap around
-    ];
-    
-    const updateQ = () => {
-      setStructures({ main: { type: 'queue', data: [...data], max: k } });
-      setVariables({ head, tail });
-    };
-    updateQ();
-
-    for (const op of ops) {
-      addStep(`Executing ${op.t}(${op.v || ''})`);
-      await sleep(speed, signal);
-      
-      if (op.t === 'enQ') {
-        if ((tail + 1) % k === head) {
-          addStep('Queue is Full!');
-        } else {
-          if (head === -1) head = 0;
-          tail = (tail + 1) % k;
-          data[tail] = op.v;
-          addStep(`Inserted ${op.v} at index ${tail}`);
-        }
+      stack.push(val);
+      if (minStack.length === 0 || val <= minStack[minStack.length - 1]) {
+        minStack.push(val);
+        pushState(stack, minStack, arr, { i }, [i], [stack.length - 1], [minStack.length - 1], {}, `${val} is new min. Pushed to MinStack.`);
       } else {
-        if (head === -1) {
-          addStep('Queue is Empty!');
-        } else {
-          addStep(`Removed ${data[head]} from index ${head}`);
-          data[head] = null;
-          if (head === tail) { head = -1; tail = -1; }
-          else head = (head + 1) % k;
-        }
+        minStack.push(minStack[minStack.length - 1]);
+        pushState(stack, minStack, arr, { i }, [i], [stack.length - 1], [minStack.length - 1], {}, `Min unchanged. Duplicated top of MinStack.`);
       }
-      updateQ();
-      await sleep(speed * 1.5, signal);
     }
+    
+    pushState(stack, minStack, arr, {}, [], [], [], {}, `✅ MinStack simulation populated. Elements pop in reverse order.`);
   };
 
-  const runInfixPostfix = async (arr, signal) => {
-    addStep('Infix to Postfix Conversion');
+  const runInfixPostfix = (arr, pushState) => {
     const prec = { '+': 1, '-': 1, '*': 2, '/': 2, '^': 3 };
     const stack = [];
-    const output = [];
+    let postfix = "";
     
-    setStructures({ main: { type: 'stack', data: [] }, result: { type: 'array', data: [] } });
-
     for (let i = 0; i < arr.length; i++) {
-      setPointers({ i }); setActiveIndices([i]);
       const c = arr[i];
+      pushState(stack, [postfix], arr, { i }, [i], [], [], {}, `Processing '${c}'`);
       
       if (/[a-zA-Z0-9]/.test(c)) {
-        addStep(`'${c}' is an operand. Adding to output.`);
-        output.push(c);
+        postfix += c;
+        pushState(stack, [postfix], arr, { i }, [i], [], [0], {}, `Operand '${c}' added directly to postfix.`);
       } else if (c === '(') {
-        addStep(`'${c}' is open parenthesis. Pushing to stack.`);
         stack.push(c);
+        pushState(stack, [postfix], arr, { i }, [i], [stack.length - 1], [], {}, `Pushed '(' to stack.`);
       } else if (c === ')') {
-        addStep(`'${c}' is closing parenthesis. Popping stack to output until '('.`);
-        while (stack.length && stack[stack.length - 1] !== '(') {
-          output.push(stack.pop());
-          setStructures({ main: { type: 'stack', data: [...stack] }, result: { type: 'array', data: [...output] } });
-          await sleep(speed, signal);
+        while (stack.length > 0 && stack[stack.length - 1] !== '(') {
+          postfix += stack.pop();
+          pushState(stack, [postfix], arr, { i }, [i], [stack.length], [0], {}, `Popping until '('. Postfix: ${postfix}`);
         }
-        stack.pop(); // discard '('
+        stack.pop(); // pop '('
+        pushState(stack, [postfix], arr, { i }, [i], [], [], {}, `Popped '(' and discarded.`);
       } else {
-        addStep(`'${c}' is an operator. Checking precedence.`);
-        while (stack.length && prec[stack[stack.length - 1]] >= prec[c]) {
-          const popped = stack.pop();
-          addStep(`Top '${popped}' has >= precedence than '${c}'. Popping to output.`);
-          output.push(popped);
-          setStructures({ main: { type: 'stack', data: [...stack] }, result: { type: 'array', data: [...output] } });
-          await sleep(speed, signal);
+        while (stack.length > 0 && (c === '^' ? prec[c] < prec[stack[stack.length - 1]] : prec[c] <= prec[stack[stack.length - 1]])) {
+          postfix += stack.pop();
+          pushState(stack, [postfix], arr, { i }, [i], [stack.length], [0], {}, `Popped higher/eq precedence operator. Postfix: ${postfix}`);
         }
-        addStep(`Pushing '${c}' to stack.`);
         stack.push(c);
+        pushState(stack, [postfix], arr, { i }, [i], [stack.length - 1], [], {}, `Pushed '${c}' to stack.`);
+      }
+    }
+    
+    while (stack.length > 0) {
+      postfix += stack.pop();
+      pushState(stack, [postfix], arr, {}, [], [stack.length], [0], {}, `Emptying remaining operators from stack. Postfix: ${postfix}`);
+    }
+    pushState([], [postfix], arr, {}, [], [], [], { Postfix: postfix }, `✅ Conversion complete!`);
+  };
+
+  const runQueueUsingStack = (arr, pushState) => {
+    const s1 = []; // primary
+    const s2 = []; // secondary
+    
+    // Simulate Enqueue
+    for (let i = 0; i < 3; i++) {
+      s1.push(arr[i]);
+      pushState(s1, s2, arr, { idx: i }, [i], [s1.length - 1], [], { Operation: `Enqueue(${arr[i]})` }, `Pushed ${arr[i]} directly to S1.`);
+    }
+    
+    // Simulate Dequeue
+    pushState(s1, s2, arr, {}, [], [], [], { Operation: `Dequeue()` }, `Dequeue requested. Transferring S1 to S2...`);
+    while (s1.length > 0) {
+      s2.push(s1.pop());
+      pushState(s1, s2, arr, {}, [], [s1.length], [s2.length - 1], { Operation: `Dequeue()` }, `Popped from S1, Pushed to S2.`);
+    }
+    
+    const dequeued = s2.pop();
+    pushState(s1, s2, arr, {}, [], [], [s2.length], { Operation: `Dequeue()`, Result: dequeued }, `✅ Popped ${dequeued} from S2. (Oldest element)`);
+  };
+
+  const runStackUsingQueue = (arr, pushState) => {
+    let q1 = []; // primary
+    let q2 = []; // secondary
+    
+    // Simulate Push
+    for (let i = 0; i < 3; i++) {
+      q2.push(arr[i]);
+      pushState(q1, q2, arr, { idx: i }, [i], [], [q2.length - 1], { Operation: `Push(${arr[i]})` }, `Enqueued ${arr[i]} to Q2 (empty).`);
+      
+      while (q1.length > 0) {
+        q2.push(q1.shift());
+        pushState(q1, q2, arr, { idx: i }, [i], [0], [q2.length - 1], { Operation: `Push(${arr[i]})` }, `Transferred from Q1 to Q2.`);
       }
       
-      setStructures({ main: { type: 'stack', data: [...stack] }, result: { type: 'array', data: [...output] } });
-      await sleep(speed * 1.2, signal);
+      // Swap names
+      let temp = q1; q1 = q2; q2 = temp;
+      pushState(q1, q2, arr, { idx: i }, [i], [], [], { Operation: `Push(${arr[i]})` }, `Swapped Q1 and Q2. Q1 now holds elements in Stack order.`);
     }
     
-    addStep('Expression parsed. Popping remaining operators.');
-    while (stack.length) {
-      output.push(stack.pop());
-      setStructures({ main: { type: 'stack', data: [...stack] }, result: { type: 'array', data: [...output] } });
-      await sleep(speed, signal);
+    // Simulate Pop
+    const popped = q1.shift();
+    pushState(q1, q2, arr, {}, [], [0], [], { Operation: `Pop()`, Result: popped }, `✅ Dequeued ${popped} from Q1. (Most recently added)`);
+  };
+
+  const runSlidingWindowMax = (arr, pushState) => {
+    const k = 3;
+    const deque = []; // primary array
+    const res = []; // secondary array
+    
+    for (let i = 0; i < arr.length; i++) {
+      pushState(deque.map(idx => arr[idx]), res, arr, { i }, [i], [], [], { K: k, DequeIndices: JSON.stringify(deque) }, `Processing element ${arr[i]} at index ${i}`);
+      
+      // Remove elements out of window
+      if (deque.length > 0 && deque[0] === i - k) {
+        const removed = deque.shift();
+        pushState(deque.map(idx => arr[idx]), res, arr, { i }, [i], [0], [], { K: k }, `Index ${removed} is out of window [${i-k+1}, ${i}]. Removed from front of deque.`);
+      }
+      
+      // Remove smaller elements
+      while (deque.length > 0 && arr[deque[deque.length - 1]] < arr[i]) {
+        const popped = deque.pop();
+        pushState(deque.map(idx => arr[idx]), res, arr, { i }, [i], [deque.length], [], { K: k }, `${arr[popped]} < ${arr[i]}. Removed from back of deque.`);
+      }
+      
+      deque.push(i);
+      pushState(deque.map(idx => arr[idx]), res, arr, { i }, [i], [deque.length - 1], [], { K: k }, `Added index ${i} to deque.`);
+      
+      if (i >= k - 1) {
+        res.push(arr[deque[0]]);
+        pushState(deque.map(idx => arr[idx]), res, arr, { i }, [deque[0]], [], [res.length - 1], { K: k }, `Max for this window is ${arr[deque[0]]}. Added to result.`);
+      }
     }
+    pushState(deque.map(idx => arr[idx]), res, arr, {}, [], [], [], { Result: JSON.stringify(res) }, `✅ Sliding Window Maximum complete.`);
+  };
+
+  const runCircularQueue = (arr, pushState) => {
+    const k = 4; // Capacity
+    const q = new Array(k).fill(null);
+    let head = -1, tail = -1, size = 0;
+    
+    pushState(q, [], arr, {}, [], [], [], { Capacity: k, Size: size, Head: head, Tail: tail }, `Initialized Circular Queue of size ${k}`);
+    
+    // Enqueue
+    for (let i = 0; i < 5; i++) {
+      if (size === k) {
+        pushState(q, [], arr, { input: i }, [i], [], [], { Capacity: k, Size: size, Head: head, Tail: tail }, `Queue is FULL! Cannot enqueue ${arr[i]}`);
+      } else {
+        if (head === -1) head = 0;
+        tail = (tail + 1) % k;
+        q[tail] = arr[i];
+        size++;
+        pushState(q, [], arr, { input: i, Head: head, Tail: tail }, [i], [tail], [], { Capacity: k, Size: size }, `Enqueued ${arr[i]} at index ${tail}`);
+      }
+    }
+    
+    // Dequeue
+    for (let i = 0; i < 2; i++) {
+      const removed = q[head];
+      q[head] = null;
+      if (head === tail) { head = -1; tail = -1; }
+      else head = (head + 1) % k;
+      size--;
+      pushState(q, [], arr, { Head: head, Tail: tail }, [], [head === -1 ? 0 : (head-1+k)%k], [], { Capacity: k, Size: size }, `Dequeued ${removed}. Head moved.`);
+    }
+    
+    // Enqueue wrapping around
+    tail = (tail + 1) % k;
+    q[tail] = 99;
+    size++;
+    pushState(q, [], arr, { Head: head, Tail: tail }, [], [tail], [], { Capacity: k, Size: size }, `Enqueued 99 at index ${tail} (Wrapped around!).`);
+    
+    pushState(q, [], arr, {}, [], [], [], {}, `✅ Circular Queue operations complete.`);
   };
 
 
-  // --- Render Helpers ---
+  // --- Playback Controls ---
+  const handlePlayPause = () => { if (trace.length === 0) executeAlgo(); else setIsPlaying(!isPlaying); };
+  const handleNext = () => { setIsPlaying(false); if (currentStep < trace.length - 1) setCurrentStep(c => c + 1); };
+  const handlePrev = () => { setIsPlaying(false); if (currentStep > 0) setCurrentStep(c => c - 1); };
 
-  const renderStack = (key, dataObj) => {
-    const isMinStack = key === 'minMap';
-    const arr = dataObj.data;
-    
-    return (
-      <div key={key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '0 2rem' }}>
-        <div style={{ color: 'var(--text-muted)', marginBottom: '0.5rem', fontSize: '0.8rem', textTransform: 'uppercase' }}>{key}</div>
-        <div style={{
-          width: '100px', 
-          minHeight: '200px',
-          border: '2px solid var(--panel-border)',
-          borderTop: 'none',
-          borderRadius: '0 0 12px 12px',
-          display: 'flex',
-          flexDirection: 'column-reverse',
-          padding: '4px',
-          gap: '4px',
-          background: 'rgba(0,0,0,0.2)'
-        }}>
-          {arr.map((val, idx) => (
-            <div key={idx} style={{
-              width: '100%', height: '40px',
-              background: isMinStack ? 'rgba(0, 255, 136, 0.2)' : 'rgba(255, 255, 255, 0.1)',
-              border: isMinStack ? '1px solid #00ff88' : '1px solid rgba(255, 255, 255, 0.3)',
-              borderRadius: '4px',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: isMinStack ? '#00ff88' : '#fff',
-              fontFamily: 'monospace', fontWeight: 'bold'
-            }}>
-              {val}
-            </div>
-          ))}
-          {arr.length === 0 && <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.2)', marginTop: 'auto', marginBottom: '10px' }}>Empty</div>}
-        </div>
-      </div>
-    );
-  };
+  // --- Rendering ---
+  const currentState = trace[currentStep] || { primary: [], secondary: [], inputArr: getInitialData(), pointers: {}, activeInput: [], activePrimary: [], activeSecondary: [], variables: {}, msg: 'Ready.' };
+  const historySteps = trace.slice(0, currentStep + 1).map(t => t.msg).filter(m => m);
 
-  const renderQueue = (key, dataObj) => {
-    const arr = dataObj.data;
+  const renderArrayHorizontal = (arr, title, activeIndices, pointersObj, prefix) => {
+    if (!arr || arr.length === 0) return null;
     return (
-      <div key={key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', margin: '2rem 0' }}>
-        <div style={{ color: 'var(--text-muted)', marginBottom: '0.5rem', fontSize: '0.8rem', textTransform: 'uppercase' }}>{key}</div>
-        <div style={{ display: 'flex', gap: '4px' }}>
+      <div style={{ marginBottom: '2rem' }}>
+        <div style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '1px' }}>{title}</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', justifyContent: 'center' }}>
           {arr.map((val, idx) => {
-            const isHead = variables.head === idx;
-            const isTail = variables.tail === idx;
+            const isActive = activeIndices.includes(idx);
+            let bg = 'rgba(255,255,255,0.05)', border = '1px solid rgba(255,255,255,0.1)', color = 'var(--text-muted)', shadow = 'none';
+            if (isActive) { bg = 'var(--active-accent)'; border = '1px solid var(--active-accent)'; color = '#000'; shadow = '0 0 15px var(--active-accent)'; }
+            else if (val !== null && val !== -1) { bg = 'rgba(0,255,136,0.1)'; border = '1px solid rgba(0,255,136,0.3)'; color = '#00ff88'; }
+
+            const myPointers = Object.entries(pointersObj).filter(([_, p]) => p === idx);
+
             return (
-              <div key={idx} style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <div style={{ height: '20px', display: 'flex', gap: '2px', color: '#ff00ff', fontSize: '0.6rem', fontWeight: 'bold' }}>
-                  {isHead && <span>HEAD</span>}
-                  {isTail && <span>TAIL</span>}
+              <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <div style={{ height: '20px', display: 'flex', gap: '2px', alignItems: 'flex-end', marginBottom: '4px' }}>
+                  {myPointers.map(([pName]) => <div key={pName} style={{ background: '#ff00ff', color: '#fff', fontSize: '0.55rem', padding: '2px 4px', borderRadius: '4px' }}>{pName}↓</div>)}
                 </div>
-                <div style={{
-                  width: '50px', height: '50px',
-                  background: val !== null ? 'var(--active-accent)' : 'rgba(255,255,255,0.05)',
-                  border: val !== null ? '1px solid var(--active-accent)' : '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: '6px',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: val !== null ? '#000' : 'rgba(255,255,255,0.2)',
-                  fontFamily: 'monospace', fontWeight: 'bold'
-                }}>
-                  {val !== null ? val : '∅'}
+                <div style={{ width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: bg, border, borderRadius: '6px', color, fontSize: '1.1rem', fontWeight: isActive ? 'bold' : 'normal', boxShadow: shadow, fontFamily: 'Fira Code, monospace' }}>
+                  {val === null ? '⊘' : val}
                 </div>
-                <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: '4px' }}>{idx}</div>
+                <div style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.3)', marginTop: '4px' }}>{idx}</div>
               </div>
             );
           })}
@@ -516,27 +444,30 @@ const StackQueueVisualizer = ({ algorithmId }) => {
     );
   };
 
-  const renderArray = (key, dataObj) => {
+  const renderStack = (arr, title, activeIndices) => {
     return (
-      <div key={key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', margin: '1rem 0' }}>
-        <div style={{ color: 'var(--text-muted)', marginBottom: '0.5rem', fontSize: '0.8rem', textTransform: 'uppercase' }}>{key}</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', justifyContent: 'center' }}>
-          {dataObj.data.map((val, idx) => (
-            <div key={idx} style={{
-              width: '40px', height: '40px',
-              background: 'rgba(0, 255, 136, 0.1)',
-              border: '1px solid rgba(0, 255, 136, 0.3)',
-              borderRadius: '4px',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: '#00ff88', fontFamily: 'monospace'
-            }}>
-              {val}
-            </div>
-          ))}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '120px' }}>
+        <div style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '1px' }}>{title}</div>
+        <div style={{ border: '2px solid var(--panel-border)', borderTop: 'none', borderRadius: '0 0 8px 8px', width: '80px', minHeight: '150px', display: 'flex', flexDirection: 'column-reverse', padding: '8px', gap: '4px', background: 'rgba(0,0,0,0.2)' }}>
+          {arr.map((val, idx) => {
+            const isActive = activeIndices.includes(idx);
+            let bg = 'rgba(255,255,255,0.05)', border = '1px solid rgba(255,255,255,0.1)', color = 'var(--text-muted)', shadow = 'none';
+            if (isActive) { bg = 'var(--active-accent)'; border = '1px solid var(--active-accent)'; color = '#000'; shadow = '0 0 10px var(--active-accent)'; }
+            else { bg = 'rgba(0,255,136,0.1)'; border = '1px solid rgba(0,255,136,0.3)'; color = '#00ff88'; }
+
+            return (
+              <div key={idx} style={{ width: '100%', height: '35px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: bg, border, borderRadius: '4px', color, fontSize: '1rem', fontWeight: isActive ? 'bold' : 'normal', boxShadow: shadow, fontFamily: 'Fira Code, monospace' }}>
+                {val}
+              </div>
+            );
+          })}
         </div>
       </div>
     );
   };
+
+  const isStackAlgo = ['next_greater', 'prev_greater', 'valid_parens', 'largest_rectangle', 'min_stack', 'infix_postfix'].includes(algorithmId);
+  const isQueueStackAlgo = ['queue_using_stack', 'stack_using_queue'].includes(algorithmId);
 
   return (
     <div style={{ display: 'flex', gap: '1rem', width: '100%', height: '100%' }}>
@@ -544,67 +475,82 @@ const StackQueueVisualizer = ({ algorithmId }) => {
         
         {/* Controls */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem', flexShrink: 0 }}>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <button onClick={() => { setMode('auto'); reset(); }} style={{ padding: '0.25rem 0.65rem', borderRadius: '4px', border: '1px solid var(--panel-border)', background: mode === 'auto' ? 'var(--active-accent)' : 'transparent', color: mode === 'auto' ? '#000' : '#fff', cursor: 'pointer', fontSize: '0.8rem' }}>Auto</button>
-            <button onClick={() => setMode('custom')} style={{ padding: '0.25rem 0.65rem', borderRadius: '4px', border: '1px solid var(--panel-border)', background: mode === 'custom' ? 'var(--active-accent)' : 'transparent', color: mode === 'custom' ? '#000' : '#fff', cursor: 'pointer', fontSize: '0.8rem' }}>Custom</button>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button onClick={() => { setMode('auto'); initData(); setTimeout(executeAlgo, 100); }}
+              style={{ padding: '0.25rem 0.65rem', borderRadius: '4px', border: '1px solid var(--panel-border)', background: mode === 'auto' ? 'var(--active-accent)' : 'transparent', color: mode === 'auto' ? '#000' : '#fff', cursor: 'pointer', fontSize: '0.8rem' }}>
+              Auto Demo
+            </button>
+            <button onClick={() => setMode('custom')}
+              style={{ padding: '0.25rem 0.65rem', borderRadius: '4px', border: '1px solid var(--panel-border)', background: mode === 'custom' ? 'var(--active-accent)' : 'transparent', color: mode === 'custom' ? '#000' : '#fff', cursor: 'pointer', fontSize: '0.8rem' }}>
+              Custom
+            </button>
             {mode === 'custom' && (
               <>
-                <input type="text" placeholder="e.g. (,[,]" value={customInput} onChange={e => setCustomInput(e.target.value)} style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid var(--panel-border)', color: '#fff', padding: '0.25rem 0.5rem', borderRadius: '4px', width: '150px', fontSize: '0.8rem' }} />
-                <button onClick={applyCustom} style={{ padding: '0.25rem 0.6rem', borderRadius: '4px', border: '1px solid var(--active-accent)', background: 'transparent', color: '#fff', cursor: 'pointer', fontSize: '0.8rem' }}>Apply</button>
+                <input type="text" placeholder="e.g. 1,2,3 or ()[]{}" value={customInputA}
+                  onChange={e => setCustomInputA(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && applyCustom()}
+                  style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid var(--panel-border)', color: '#fff', padding: '0.25rem 0.5rem', borderRadius: '4px', width: '120px', fontSize: '0.8rem' }} />
+                <button onClick={applyCustom}
+                  style={{ padding: '0.25rem 0.6rem', borderRadius: '4px', border: '1px solid var(--active-accent)', background: 'transparent', color: '#fff', cursor: 'pointer', fontSize: '0.8rem' }}>
+                  Apply
+                </button>
               </>
             )}
             <div style={{ width: '1px', height: '20px', background: 'rgba(255,255,255,0.15)', margin: '0 4px' }} />
-            <input type="range" min="20" max="600" value={600 - speed + 20} onChange={e => setSpeed(600 - parseInt(e.target.value) + 20)} style={{ width: '80px', accentColor: 'var(--active-accent)' }} />
+            <div style={{ display: 'flex', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--panel-border)', borderRadius: '4px', overflow: 'hidden' }}>
+              <button onClick={handlePrev} disabled={currentStep === 0 || trace.length === 0} style={{ padding: '0.25rem 0.5rem', background: 'transparent', border: 'none', borderRight: '1px solid var(--panel-border)', color: '#fff', cursor: 'pointer', opacity: currentStep === 0 ? 0.3 : 1 }}>⏮</button>
+              <button onClick={handlePlayPause} style={{ padding: '0.25rem 0.75rem', background: isPlaying ? 'rgba(255,255,255,0.1)' : 'transparent', border: 'none', color: 'var(--active-accent)', fontWeight: 'bold', cursor: 'pointer', width: '60px' }}>{isPlaying ? '⏸' : '▶️'}</button>
+              <button onClick={handleNext} disabled={currentStep >= trace.length - 1} style={{ padding: '0.25rem 0.5rem', background: 'transparent', border: 'none', borderLeft: '1px solid var(--panel-border)', color: '#fff', cursor: 'pointer', opacity: currentStep >= trace.length - 1 ? 0.3 : 1 }}>⏭</button>
+            </div>
+            <input type="range" min="100" max="1500" value={1500 - speed + 100} onChange={e => setSpeed(1500 - parseInt(e.target.value) + 100)} style={{ width: '80px', accentColor: 'var(--active-accent)' }} />
           </div>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button onClick={reset} disabled={isRunning} style={{ background: 'transparent', border: '1px solid var(--panel-border)', color: '#fff', padding: '0.35rem 0.8rem', borderRadius: '4px', cursor: isRunning ? 'not-allowed' : 'pointer', opacity: isRunning ? 0.5 : 1, fontSize: '0.8rem' }}>Reset</button>
-            <button onClick={isRunning ? abort : execute} style={{ background: isRunning ? '#ff4444' : 'var(--active-accent)', border: 'none', color: '#000', fontWeight: 'bold', padding: '0.35rem 1.2rem', borderRadius: '4px', cursor: 'pointer', boxShadow: '0 0 10px var(--active-accent)', fontSize: '0.8rem' }}>{isRunning ? 'Stop' : 'Execute'}</button>
+            <button onClick={initData} style={{ background: 'transparent', border: '1px solid var(--panel-border)', color: '#fff', padding: '0.35rem 0.8rem', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>Reset</button>
           </div>
         </div>
 
-        {/* Top Array Input Display (if algorithm processes an array linearly) */}
-        {inputArray.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', justifyContent: 'center', marginBottom: '2rem' }}>
-            {inputArray.map((val, idx) => (
-              <div key={idx} style={{
-                position: 'relative', width: '35px', height: '35px',
-                background: activeIndices.includes(idx) ? 'var(--active-accent)' : 'rgba(255,255,255,0.05)',
-                border: activeIndices.includes(idx) ? '1px solid var(--active-accent)' : '1px solid rgba(255,255,255,0.1)',
-                borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: activeIndices.includes(idx) ? '#000' : 'var(--text-muted)', fontFamily: 'monospace'
-              }}>
-                {val}
-                {Object.entries(pointers).find(([_, pIdx]) => pIdx === idx) && (
-                  <div style={{ position: 'absolute', top: '-15px', color: '#ff00ff', fontSize: '0.6rem', fontWeight: 'bold' }}>↓</div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Variables */}
-        {Object.keys(variables).length > 0 && (
+        {/* Variables Tracker */}
+        {Object.keys(currentState.variables).length > 0 && (
           <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', padding: '0.75rem', background: 'rgba(0,0,0,0.3)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap' }}>
-            {Object.entries(variables).map(([key, val]) => (
+            {Object.entries(currentState.variables).map(([key, val]) => (
               <div key={key} style={{ display: 'flex', flexDirection: 'column' }}>
-                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{key}</span>
-                <span style={{ fontSize: '1rem', fontWeight: 'bold', color: 'var(--active-accent)', fontFamily: 'monospace' }}>{val}</span>
+                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>{key}</span>
+                <span style={{ fontSize: '1.1rem', fontWeight: 'bold', color: 'var(--active-accent)', fontFamily: 'Fira Code, monospace' }}>{val}</span>
               </div>
             ))}
           </div>
         )}
 
-        {/* Structures Area */}
-        <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'flex-end', flexWrap: 'wrap', overflowY: 'auto' }}>
-          {Object.entries(structures).map(([key, dataObj]) => {
-            if (dataObj.type === 'stack') return renderStack(key, dataObj);
-            if (dataObj.type === 'queue') return renderQueue(key, dataObj);
-            if (dataObj.type === 'array') return renderArray(key, dataObj);
-            return null;
-          })}
+        {/* Visualization Area */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+          
+          {renderArrayHorizontal(currentState.inputArr, 'Input Data', currentState.activeInput, currentState.pointers, 'input')}
+          
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '4rem', marginTop: '1rem' }}>
+            {isStackAlgo ? (
+              <>
+                {renderStack(currentState.primary, 'Stack', currentState.activePrimary)}
+                {currentState.secondary.length > 0 && (
+                  algorithmId === 'min_stack' ? renderStack(currentState.secondary, 'Min Stack', currentState.activeSecondary) : 
+                  renderArrayHorizontal(currentState.secondary, 'Result Array', currentState.activeSecondary, {}, 'sec')
+                )}
+              </>
+            ) : isQueueStackAlgo ? (
+              <>
+                {renderStack(currentState.primary, 'S1 / Q1', currentState.activePrimary)}
+                {renderStack(currentState.secondary, 'S2 / Q2', currentState.activeSecondary)}
+              </>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', width: '100%', alignItems: 'center' }}>
+                {renderArrayHorizontal(currentState.primary, 'Queue / Deque', currentState.activePrimary, currentState.pointers, 'q')}
+                {renderArrayHorizontal(currentState.secondary, 'Result Array', currentState.activeSecondary, {}, 'res')}
+              </div>
+            )}
+          </div>
+
         </div>
       </div>
-      <StepLog steps={steps} currentStep={steps.length - 1} />
+      <StepLog steps={historySteps} currentStep={currentStep} />
     </div>
   );
 };

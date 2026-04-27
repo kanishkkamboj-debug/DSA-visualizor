@@ -1,0 +1,14 @@
+# Task: Add Custom Inputs to All Visualizers
+
+- `[x]` Modify `ArrayVisualizer.jsx`
+- `[x]` Modify `StackQueueVisualizer.jsx`
+- `[x]` Modify `AdvancedDSAVisualizer.jsx`
+- `[x]` Modify `GreedyVisualizer.jsx`
+- `[x]` Modify `HashVisualizer.jsx`
+- `[x]` Modify `LinkedListVisualizer.jsx`
+- `[x]` Modify `MathBitVisualizer.jsx`
+- `[x]` Modify `RecursionBacktrackingVisualizer.jsx`
+- `[x]` Modify `StringVisualizer.jsx`
+- `[x]` Modify `TreeVisualizer.jsx`
+- `[x]` Modify `DPTableVisualizer.jsx`
+- `[x]` Modify `MergeSortTree.jsx` (if applicable)

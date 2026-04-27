@@ -34,7 +34,11 @@ const TreeVisualizer = ({ algorithmId }) => {
     setTrace([]);
     setCurrentStep(0);
     setErrorMsg('');
-    if (mode === 'custom') setMode('auto');
+  };
+
+  const applyCustom = () => {
+    if (!customInput.trim()) return;
+    initTree();
   };
 
   const getInitialArray = () => {
@@ -69,7 +73,7 @@ const TreeVisualizer = ({ algorithmId }) => {
       });
     };
 
-    pushState(initArr, {}, [], [], [], {}, 'Initializing Tree Algorithm...');
+    pushState(initArr, {}, [], [], [], {}, `Starting ${algorithmId.replaceAll('_', ' ')}...`);
 
     const arrCopy = [...initArr];
 
@@ -184,7 +188,7 @@ const TreeVisualizer = ({ algorithmId }) => {
   };
 
   const runBSTSearch = (arr, pushState) => {
-    const target = arr[Math.floor(Math.random() * arr.length)];
+    const target = (mode === 'custom' && customInput && customInput.split('|')[1]) ? parseInt(customInput.split('|')[1]) : arr[Math.floor(Math.random() * arr.length)];
     let curr = 0;
     const path = [];
     
@@ -380,8 +384,27 @@ const TreeVisualizer = ({ algorithmId }) => {
         
         {/* Controls */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem', flexShrink: 0 }}>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <button style={{ padding: '0.25rem 0.65rem', borderRadius: '4px', border: '1px solid var(--panel-border)', background: 'var(--active-accent)', color: '#000', cursor: 'pointer', fontSize: '0.8rem' }}>Auto Demo</button>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button onClick={() => { setMode('auto'); initTree(); setTimeout(executeTreeAlgo, 100); }}
+              style={{ padding: '0.25rem 0.65rem', borderRadius: '4px', border: '1px solid var(--panel-border)', background: mode === 'auto' ? 'var(--active-accent)' : 'transparent', color: mode === 'auto' ? '#000' : '#fff', cursor: 'pointer', fontSize: '0.8rem' }}>
+              Auto Demo
+            </button>
+            <button onClick={() => setMode('custom')}
+              style={{ padding: '0.25rem 0.65rem', borderRadius: '4px', border: '1px solid var(--panel-border)', background: mode === 'custom' ? 'var(--active-accent)' : 'transparent', color: mode === 'custom' ? '#000' : '#fff', cursor: 'pointer', fontSize: '0.8rem' }}>
+              Custom
+            </button>
+            {mode === 'custom' && (
+              <>
+                <input type="text" placeholder={algorithmId === 'bst_search' ? "Tree | Target" : "e.g. 10,5,15,null,7"} value={customInput}
+                  onChange={e => setCustomInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && applyCustom()}
+                  style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid var(--panel-border)', color: '#fff', padding: '0.25rem 0.5rem', borderRadius: '4px', width: '150px', fontSize: '0.8rem' }} />
+                <button onClick={applyCustom}
+                  style={{ padding: '0.25rem 0.6rem', borderRadius: '4px', border: '1px solid var(--active-accent)', background: 'transparent', color: '#fff', cursor: 'pointer', fontSize: '0.8rem' }}>
+                  Apply
+                </button>
+              </>
+            )}
             
             <div style={{ width: '1px', height: '20px', background: 'rgba(255,255,255,0.15)', margin: '0 4px' }} />
             

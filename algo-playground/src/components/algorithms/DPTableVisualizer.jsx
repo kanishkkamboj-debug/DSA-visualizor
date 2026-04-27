@@ -34,7 +34,39 @@ const DPTableVisualizer = ({ algorithmId }) => {
     setTrace([]);
     setCurrentStep(0);
     setErrorMsg('');
-    if (mode === 'custom') setMode('auto'); // Custom inputs for DP vary heavily by algo, limiting to auto for robust visualization
+  };
+
+  const applyCustom = () => {
+    if (!customInput.trim()) return;
+    initDP();
+  };
+
+  const getInitialData = () => {
+    if (mode === 'custom' && customInput) {
+      if (algorithmId === 'fib_dp' || algorithmId === 'climbing_stairs') {
+        return parseInt(customInput) || 10;
+      }
+      if (algorithmId === 'house_robber' || algorithmId === 'lis') {
+        return customInput.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+      }
+      if (algorithmId === 'knapsack_01') {
+        const parts = customInput.split('|');
+        if (parts.length === 3) {
+          return {
+            W: parseInt(parts[0]) || 8,
+            wt: parts[1].split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n)),
+            val: parts[2].split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n))
+          };
+        }
+      }
+      if (algorithmId === 'lcs' || algorithmId === 'edit_distance') {
+        const parts = customInput.split('|');
+        if (parts.length === 2) {
+          return { s1: parts[0].trim(), s2: parts[1].trim() };
+        }
+      }
+    }
+    return null;
   };
 
   const executeDPAlgo = () => {
@@ -53,13 +85,15 @@ const DPTableVisualizer = ({ algorithmId }) => {
       });
     };
 
+    const customData = getInitialData();
+
     switch (algorithmId) {
-      case 'fib_dp': case 'climbing_stairs': runFib(pushState); break;
-      case 'knapsack_01': runKnapsack(pushState); break;
-      case 'lcs': runLCS(pushState); break;
-      case 'edit_distance': runEditDistance(pushState); break;
-      case 'lis': runLIS(pushState); break;
-      case 'house_robber': runHouseRobber(pushState); break;
+      case 'fib_dp': case 'climbing_stairs': runFib(pushState, customData); break;
+      case 'knapsack_01': runKnapsack(pushState, customData); break;
+      case 'lcs': runLCS(pushState, customData); break;
+      case 'edit_distance': runEditDistance(pushState, customData); break;
+      case 'lis': runLIS(pushState, customData); break;
+      case 'house_robber': runHouseRobber(pushState, customData); break;
       default: pushState([], '1D', -1, -1, [], [], [], `Logic for ${algorithmId} coming soon.`); break;
     }
 
@@ -70,8 +104,8 @@ const DPTableVisualizer = ({ algorithmId }) => {
 
   // --- Algorithms ---
 
-  const runFib = (pushState) => {
-    const n = 10;
+  const runFib = (pushState, customData) => {
+    const n = customData || 10;
     const dp = new Array(n + 1).fill('');
     const labels = Array.from({length: n + 1}, (_, i) => i);
     
@@ -86,8 +120,8 @@ const DPTableVisualizer = ({ algorithmId }) => {
     pushState(dp, '1D', -1, -1, [], [], labels, `✅ Sequence generated. Result: ${dp[n]}`);
   };
 
-  const runHouseRobber = (pushState) => {
-    const nums = [2, 7, 9, 3, 1];
+  const runHouseRobber = (pushState, customData) => {
+    const nums = customData || [2, 7, 9, 3, 1];
     const dp = new Array(nums.length).fill('');
     const labels = nums;
     
@@ -105,8 +139,8 @@ const DPTableVisualizer = ({ algorithmId }) => {
     pushState(dp, '1D', -1, -1, [], [], labels, `✅ House Robber DP Complete. Max Loot: ${dp[nums.length - 1]}`);
   };
 
-  const runLIS = (pushState) => {
-    const nums = [10, 9, 2, 5, 3, 7, 101, 18];
+  const runLIS = (pushState, customData) => {
+    const nums = customData || [10, 9, 2, 5, 3, 7, 101, 18];
     const n = nums.length;
     const dp = new Array(n).fill(1);
     const labels = nums;
@@ -126,10 +160,10 @@ const DPTableVisualizer = ({ algorithmId }) => {
     pushState(dp, '1D', -1, -1, [], [], labels, `✅ LIS Complete. Max Length: ${max}`);
   };
 
-  const runKnapsack = (pushState) => {
-    const W = 8;
-    const wt = [3, 4, 5];
-    const val = [30, 50, 60];
+  const runKnapsack = (pushState, customData) => {
+    const W = customData?.W || 8;
+    const wt = customData?.wt || [3, 4, 5];
+    const val = customData?.val || [30, 50, 60];
     const n = wt.length;
     
     const dp = Array.from({length: n + 1}, () => new Array(W + 1).fill(''));
@@ -155,9 +189,9 @@ const DPTableVisualizer = ({ algorithmId }) => {
     pushState(dp, '2D', -1, -1, [], rLabels, cLabels, `✅ 0/1 Knapsack Complete. Max Value: ${dp[n][W]}`);
   };
 
-  const runLCS = (pushState) => {
-    const s1 = "ABCDGH";
-    const s2 = "AEDFHR";
+  const runLCS = (pushState, customData) => {
+    const s1 = customData?.s1 || "ABCDGH";
+    const s2 = customData?.s2 || "AEDFHR";
     const m = s1.length, n = s2.length;
     
     const dp = Array.from({length: m + 1}, () => new Array(n + 1).fill(''));
@@ -183,9 +217,9 @@ const DPTableVisualizer = ({ algorithmId }) => {
     pushState(dp, '2D', -1, -1, [], rLabels, cLabels, `✅ LCS Complete. Length: ${dp[m][n]}`);
   };
 
-  const runEditDistance = (pushState) => {
-    const s1 = "horse";
-    const s2 = "ros";
+  const runEditDistance = (pushState, customData) => {
+    const s1 = customData?.s1 || "horse";
+    const s2 = customData?.s2 || "ros";
     const m = s1.length, n = s2.length;
     
     const dp = Array.from({length: m + 1}, () => new Array(n + 1).fill(''));
@@ -320,7 +354,33 @@ const DPTableVisualizer = ({ algorithmId }) => {
         {/* Controls */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-            <button style={{ padding: '0.25rem 0.75rem', borderRadius: '4px', border: '1px solid var(--panel-border)', background: 'var(--active-accent)', color: '#000', cursor: 'pointer' }}>Auto Demo Mode</button>
+            <button onClick={() => { setMode('auto'); initDP(); }}
+              style={{ padding: '0.25rem 0.65rem', borderRadius: '4px', border: '1px solid var(--panel-border)', background: mode === 'auto' ? 'var(--active-accent)' : 'transparent', color: mode === 'auto' ? '#000' : '#fff', cursor: 'pointer', fontSize: '0.8rem' }}>
+              Auto
+            </button>
+            <button onClick={() => setMode('custom')}
+              style={{ padding: '0.25rem 0.65rem', borderRadius: '4px', border: '1px solid var(--panel-border)', background: mode === 'custom' ? 'var(--active-accent)' : 'transparent', color: mode === 'custom' ? '#000' : '#fff', cursor: 'pointer', fontSize: '0.8rem' }}>
+              Custom
+            </button>
+            {mode === 'custom' && (() => {
+              let placeholder = "Custom input...";
+              if (algorithmId === 'fib_dp' || algorithmId === 'climbing_stairs') placeholder = "e.g. 10";
+              if (algorithmId === 'house_robber' || algorithmId === 'lis') placeholder = "e.g. 2,7,9,3,1";
+              if (algorithmId === 'knapsack_01') placeholder = "e.g. 8|3,4,5|30,50,60";
+              if (algorithmId === 'lcs' || algorithmId === 'edit_distance') placeholder = "e.g. ABCDGH|AEDFHR";
+              return (
+                <>
+                  <input type="text" placeholder={placeholder} value={customInput}
+                    onChange={e => setCustomInput(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && applyCustom()}
+                    style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid var(--panel-border)', color: '#fff', padding: '0.25rem 0.5rem', borderRadius: '4px', width: '150px', fontSize: '0.8rem' }} />
+                  <button onClick={applyCustom}
+                    style={{ padding: '0.25rem 0.6rem', borderRadius: '4px', border: '1px solid var(--active-accent)', background: 'transparent', color: '#fff', cursor: 'pointer', fontSize: '0.8rem' }}>
+                    Apply
+                  </button>
+                </>
+              );
+            })()}
             
             <div style={{ width: '1px', height: '20px', background: 'rgba(255,255,255,0.15)', margin: '0 4px' }} />
             

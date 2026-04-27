@@ -108,7 +108,7 @@ const SortVisualizer = ({ algorithmId }) => {
       case 'bucket_sort': runBucketSort(arr, pushState); break;
       case 'quick_select': runQuickSelect(arr, pushState); break;
       case 'binary_search': runBinarySearch(arr, pushState); break;
-      default: pushState(arr, [], [], null, `Logic for ${algorithmId} coming soon.`); break;
+      default: pushState(arr, [], [], null, `Logic for ${algorithmId.replaceAll('_', ' ')} coming soon.`); break;
     }
 
     pushState(arr, [], arr.map((_, i) => i), null, '✅ Algorithm Complete!');
@@ -424,9 +424,9 @@ const SortVisualizer = ({ algorithmId }) => {
         {/* ── Shared Controls ── */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem', flexShrink: 0 }}>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-            <button onClick={() => { setMode('auto'); reset(); }}
+            <button onClick={() => { setMode('auto'); reset(); setTimeout(executeSort, 100); }}
               style={{ padding: '0.25rem 0.65rem', borderRadius: '4px', border: '1px solid var(--panel-border)', background: mode === 'auto' ? 'var(--active-accent)' : 'transparent', color: mode === 'auto' ? '#000' : '#fff', cursor: 'pointer', fontSize: '0.8rem' }}>
-              Auto
+              Auto Demo
             </button>
             <button onClick={() => setMode('custom')}
               style={{ padding: '0.25rem 0.65rem', borderRadius: '4px', border: '1px solid var(--panel-border)', background: mode === 'custom' ? 'var(--active-accent)' : 'transparent', color: mode === 'custom' ? '#000' : '#fff', cursor: 'pointer', fontSize: '0.8rem' }}>

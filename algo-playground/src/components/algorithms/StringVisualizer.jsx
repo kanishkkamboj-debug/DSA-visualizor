@@ -2,374 +2,387 @@ import React, { useState, useEffect, useRef } from 'react';
 import StepLog from './StepLog';
 
 const StringVisualizer = ({ algorithmId }) => {
-  const [strA, setStrA] = useState([]);
-  const [strB, setStrB] = useState([]); // For anagram, matching, min window
-  
-  const [speed, setSpeed] = useState(200);
+  const [speed, setSpeed] = useState(300);
   const [mode, setMode] = useState('auto');
   const [customInputA, setCustomInputA] = useState('');
   const [customInputB, setCustomInputB] = useState('');
-  
-  const [isRunning, setIsRunning] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-  
-  // Visualization State
-  const [steps, setSteps] = useState([]);
-  const [pointersA, setPointersA] = useState({});
-  const [pointersB, setPointersB] = useState({});
-  const [activeA, setActiveA] = useState([]);
-  const [activeB, setActiveB] = useState([]);
-  const [processedA, setProcessedA] = useState([]);
-  const [processedB, setProcessedB] = useState([]);
-  const [variables, setVariables] = useState({});
-  const [windowRangeA, setWindowRangeA] = useState(null);
-  const [secondaryArray, setSecondaryArray] = useState(null);
 
-  const abortController = useRef(null);
-
-  useEffect(() => {
-    reset();
-  }, [algorithmId]);
+  // --- Snapshot Animation Engine State ---
+  const [trace, setTrace] = useState([]);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   const needsTwoStrings = ['anagram_check', 'kmp', 'rabin_karp', 'min_window_substr', 'string_matching'].includes(algorithmId);
 
-  const reset = () => {
-    if (abortController.current) abortController.current.abort();
-    generateData();
-    setIsRunning(false);
-    setSteps([]);
-    setPointersA({});
-    setPointersB({});
-    setActiveA([]);
-    setActiveB([]);
-    setProcessedA([]);
-    setProcessedB([]);
-    setVariables({});
-    setWindowRangeA(null);
-    setSecondaryArray(null);
-    setErrorMsg('');
-  };
+  useEffect(() => {
+    initStrings();
+  }, [algorithmId]);
 
-  const generateData = () => {
-    if (mode === 'custom' && customInputA) {
-      setStrA(customInputA.split(''));
-      if (needsTwoStrings) setStrB(customInputB.split(''));
-      return;
+  useEffect(() => {
+    let timer;
+    if (isPlaying && currentStep < trace.length - 1) {
+      timer = setTimeout(() => {
+        setCurrentStep(prev => prev + 1);
+      }, speed);
+    } else if (currentStep >= trace.length - 1 && trace.length > 0) {
+      setIsPlaying(false);
     }
-    
-    if (algorithmId === 'palindrome_check' || algorithmId === 'manacher') {
-      setStrA("racecar".split(''));
-    } else if (algorithmId === 'anagram_check') {
-      setStrA("listen".split(''));
-      setStrB("silent".split(''));
-    } else if (algorithmId === 'longest_common_prefix') {
-      setStrA("flower".split('')); // Simplify to one string vs prefix string variable
-    } else if (algorithmId === 'sliding_window_str') {
-      setStrA("abcabcbb".split(''));
-    } else if (algorithmId === 'min_window_substr') {
-      setStrA("ADOBECODEBANC".split(''));
-      setStrB("ABC".split(''));
-    } else if (algorithmId === 'kmp' || algorithmId === 'rabin_karp' || algorithmId === 'string_matching') {
-      setStrA("ABABDABACDABABCABAB".split(''));
-      setStrB("ABABCABAB".split(''));
-    } else if (algorithmId === 'z_algorithm') {
-      setStrA("aabcaabxaaaz".split(''));
-    } else {
-      setStrA("algorithms".split(''));
-    }
+    return () => clearTimeout(timer);
+  }, [isPlaying, currentStep, trace, speed]);
+
+  const initStrings = () => {
+    setIsPlaying(false);
+    setTrace([]);
+    setCurrentStep(0);
+    setErrorMsg('');
   };
 
   const applyCustom = () => {
-    if (!customInputA) {
-      setErrorMsg('Please enter a string.');
-      return;
-    }
-    setErrorMsg('');
-    if (abortController.current) abortController.current.abort();
-    setIsRunning(false);
-    setSteps([]);
-    setPointersA({}); setPointersB({});
-    setActiveA([]); setActiveB([]);
-    setProcessedA([]); setProcessedB([]);
-    setVariables({});
-    setWindowRangeA(null);
-    setSecondaryArray(null);
-    setStrA(customInputA.split(''));
-    if (needsTwoStrings) setStrB(customInputB.split(''));
+    if (!customInputA.trim()) return;
+    initStrings();
   };
 
-  const sleep = (ms, signal) => {
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(resolve, ms);
-      signal.addEventListener('abort', () => {
-        clearTimeout(timeout);
-        reject(new DOMException('Aborted', 'AbortError'));
+  const getInitialData = () => {
+    let a = [], b = [];
+    if (mode === 'custom' && customInputA) {
+      if (algorithmId === 'longest_common_prefix') {
+        a = customInputA.split(',').map(s => s.trim());
+      } else {
+        a = customInputA.split('');
+      }
+      if (needsTwoStrings) b = customInputB.split('');
+      return { a, b };
+    }
+    
+    switch (algorithmId) {
+      case 'palindrome_check': a = "racecar".split(''); break;
+      case 'manacher': a = "babad".split(''); break;
+      case 'anagram_check': a = "listen".split(''); b = "silent".split(''); break;
+      case 'longest_common_prefix': a = "flower,flow,flight".split(','); break; // Special case: array of strings
+      case 'sliding_window_str': a = "abcabcbb".split(''); break;
+      case 'min_window_substr': a = "ADOBECODEBANC".split(''); b = "ABC".split(''); break;
+      case 'kmp': 
+      case 'rabin_karp': 
+      case 'string_matching': 
+        a = "ABABDABACDABABCABAB".split(''); b = "ABABCABAB".split(''); break;
+      case 'z_algorithm': a = "aabcaabxaaaz".split(''); break;
+      default: a = "algorithms".split('');
+    }
+    return { a, b };
+  };
+
+  const executeAlgo = () => {
+    if (trace.length > 0 && currentStep === 0) { setIsPlaying(true); return; }
+    if (currentStep > 0 && currentStep < trace.length - 1) { setIsPlaying(true); return; }
+    if (currentStep >= trace.length - 1 && trace.length > 0) { setCurrentStep(0); setIsPlaying(true); return; }
+
+    const { a: initA, b: initB } = getInitialData();
+    const newTrace = [];
+    
+    const pushState = (arrA, arrB, ptrA={}, ptrB={}, actA=[], actB=[], procA=[], procB=[], winA=null, vars={}, sec=null, msg='') => {
+      newTrace.push({
+        strA: [...arrA], strB: [...arrB],
+        pointersA: {...ptrA}, pointersB: {...ptrB},
+        activeA: [...actA], activeB: [...actB],
+        processedA: [...procA], processedB: [...procB],
+        windowRangeA: winA, variables: {...vars},
+        secondaryArray: sec ? {...sec, data: [...sec.data]} : null, msg
       });
-    });
-  };
+    };
 
-  const addStep = (msg) => setSteps(prev => [...prev, msg]);
+    pushState(initA, initB, {}, {}, [], [], [], [], null, {}, null, `Starting ${algorithmId.replaceAll('_', ' ')}...`);
 
-  const execute = async () => {
-    if (isRunning) return;
-    setIsRunning(true);
-    setSteps([]); setPointersA({}); setPointersB({});
-    setActiveA([]); setActiveB([]); setProcessedA([]); setProcessedB([]);
-    setVariables({}); setWindowRangeA(null); setSecondaryArray(null);
-    
-    abortController.current = new AbortController();
-    const signal = abortController.current.signal;
+    const a = [...initA], b = [...initB];
 
-    try {
-      const workingA = [...strA];
-      const workingB = [...strB];
-      
-      switch (algorithmId) {
-        case 'reverse_string': await runReverseString(workingA, signal); break;
-        case 'palindrome_check': await runPalindrome(workingA, signal); break;
-        case 'anagram_check': await runAnagram(workingA, workingB, signal); break;
-        case 'sliding_window_str': await runSlidingWindow(workingA, signal); break;
-        case 'min_window_substr': await runMinWindow(workingA, workingB, signal); break;
-        case 'kmp': await runKMP(workingA, workingB, signal); break;
-        default: addStep(`Visualization for ${algorithmId} is coming soon.`);
-      }
-      if (!signal.aborted) addStep('Algorithm complete.');
-    } catch (err) {
-      if (err.name !== 'AbortError') console.error(err);
-      addStep('Execution stopped.');
-    } finally {
-      setIsRunning(false);
+    switch (algorithmId) {
+      case 'reverse_string': runReverseString(a, pushState); break;
+      case 'palindrome_check': runPalindrome(a, pushState); break;
+      case 'anagram_check': runAnagram(a, b, pushState); break;
+      case 'longest_common_prefix': runLCP(a, pushState); break; // 'a' is an array of strings here
+      case 'sliding_window_str': runSlidingWindow(a, pushState); break;
+      case 'min_window_substr': runMinWindow(a, b, pushState); break;
+      case 'kmp': runKMP(a, b, pushState); break;
+      case 'rabin_karp': runRabinKarp(a, b, pushState); break;
+      case 'z_algorithm': runZAlgorithm(a, pushState); break;
+      case 'manacher': runManacher(a, pushState); break;
+      case 'string_matching': runNaiveMatch(a, b, pushState); break;
+      default: pushState(a, b, {}, {}, [], [], [], [], null, {}, null, `Logic for ${algorithmId} pending.`); break;
     }
+
+    if (newTrace.length === 1) pushState(a, b, {}, {}, [], [], [], [], null, {}, null, 'Finished.');
+
+    setTrace(newTrace);
+    setCurrentStep(0);
+    setIsPlaying(true);
   };
 
-  const abort = () => { if (abortController.current) abortController.current.abort(); };
+  // --- Algorithms ---
 
-  // --- Algorithm Implementations ---
-
-  const runReverseString = async (arr, signal) => {
-    addStep('Reversing String: Two-pointer swap.');
+  const runReverseString = (arr, pushState) => {
     let l = 0, r = arr.length - 1;
     while (l < r) {
-      setPointersA({ L: l, R: r });
-      setActiveA([l, r]);
-      await sleep(speed, signal);
+      pushState(arr, [], { L: l, R: r }, {}, [l, r], [], [], [], null, {}, null, `Swapping '${arr[l]}' and '${arr[r]}'`);
       [arr[l], arr[r]] = [arr[r], arr[l]];
-      setStrA([...arr]);
-      addStep(`Swapped arr[${l}] and arr[${r}]`);
-      setProcessedA(prev => [...prev, l, r]);
+      pushState(arr, [], { L: l, R: r }, {}, [l, r], [], [], [], null, {}, null, `Swapped.`);
       l++; r--;
-      await sleep(speed, signal);
     }
+    pushState(arr, [], {}, {}, [], [], arr.map((_, i) => i), [], null, {}, null, `✅ String reversed.`);
   };
 
-  const runPalindrome = async (arr, signal) => {
-    addStep('Palindrome Check: Two pointers converging from ends.');
+  const runPalindrome = (arr, pushState) => {
     let l = 0, r = arr.length - 1;
     while (l < r) {
-      setPointersA({ L: l, R: r });
-      setActiveA([l, r]);
-      addStep(`Comparing ${arr[l]} and ${arr[r]}`);
-      await sleep(speed * 1.5, signal);
+      pushState(arr, [], { L: l, R: r }, {}, [l, r], [], [], [], null, {}, null, `Comparing '${arr[l]}' and '${arr[r]}'`);
       if (arr[l] !== arr[r]) {
-        addStep('Mismatch found! Not a palindrome.');
+        pushState(arr, [], { L: l, R: r }, {}, [l, r], [], [], [], null, {}, null, `❌ Mismatch! Not a palindrome.`);
         return;
       }
-      setProcessedA(prev => [...prev, l, r]);
       l++; r--;
     }
-    addStep('All characters match. It is a palindrome!');
+    pushState(arr, [], {}, {}, [], [], arr.map((_, i) => i), [], null, {}, null, `✅ All characters match. It is a palindrome!`);
   };
 
-  const runAnagram = async (arrA, arrB, signal) => {
-    if (arrA.length !== arrB.length) {
-      addStep('Lengths differ, not anagrams.');
+  const runAnagram = (a, b, pushState) => {
+    if (a.length !== b.length) {
+      pushState(a, b, {}, {}, [], [], [], [], null, {}, null, `❌ Lengths differ, cannot be anagrams.`);
       return;
     }
-    addStep('Anagram Check: Frequency map counting.');
     const count = {};
-    
-    addStep('Pass 1: Incrementing counts for String A');
-    for (let i = 0; i < arrA.length; i++) {
-      setPointersA({ i }); setActiveA([i]);
-      const c = arrA[i];
-      count[c] = (count[c] || 0) + 1;
-      setVariables({ ...count });
-      setProcessedA(prev => [...prev, i]);
-      await sleep(speed, signal);
+    for (let i = 0; i < a.length; i++) {
+      count[a[i]] = (count[a[i]] || 0) + 1;
+      pushState(a, b, { i }, {}, [i], [], Array.from({length:i}, (_,idx)=>idx), [], null, { ...count }, null, `Counting char '${a[i]}' from string 1`);
     }
-    
-    addStep('Pass 2: Decrementing counts for String B');
-    for (let i = 0; i < arrB.length; i++) {
-      setPointersB({ i }); setActiveB([i]);
-      const c = arrB[i];
-      if (!count[c]) {
-        addStep(`Character '${c}' not found or overused. Not an anagram!`);
+    for (let i = 0; i < b.length; i++) {
+      if (!count[b[i]]) {
+        pushState(a, b, {}, { i }, [], [i], a.map((_,x)=>x), Array.from({length:i}, (_,idx)=>idx), null, { ...count }, null, `❌ '${b[i]}' not found or overused. Not an anagram.`);
         return;
       }
-      count[c]--;
-      if (count[c] === 0) delete count[c];
-      setVariables({ ...count });
-      setProcessedB(prev => [...prev, i]);
-      await sleep(speed, signal);
+      count[b[i]]--;
+      if (count[b[i]] === 0) delete count[b[i]];
+      pushState(a, b, {}, { i }, [], [i], a.map((_,x)=>x), Array.from({length:i}, (_,idx)=>idx), null, { ...count }, null, `Decrementing count for '${b[i]}'`);
     }
-    addStep('All counts reached zero. They are anagrams!');
+    pushState(a, b, {}, {}, [], [], a.map((_,x)=>x), b.map((_,x)=>x), null, {}, null, `✅ All counts reached zero. They are anagrams!`);
   };
 
-  const runSlidingWindow = async (arr, signal) => {
-    addStep('Longest Substring Without Repeating Characters.');
+  const runLCP = (strs, pushState) => {
+    // Treat 'strs' array elements as chars in our visualizer for this specific algo
+    // Normally LCP takes array of strings. We will visualize the prefix shrinking.
+    if (!strs.length) return;
+    let prefix = strs[0];
+    pushState(prefix.split(''), [], {}, {}, [], [], [], [], null, { Strings: JSON.stringify(strs) }, null, `Initial prefix: "${prefix}"`);
+    
+    for (let i = 1; i < strs.length; i++) {
+      while (!strs[i].startsWith(prefix)) {
+        pushState(prefix.split(''), [], {}, {}, [], [], [], [], null, { Target: strs[i] }, null, `"${strs[i]}" does not start with "${prefix}". Shrinking prefix.`);
+        prefix = prefix.slice(0, -1);
+        if (!prefix) {
+          pushState([], [], {}, {}, [], [], [], [], null, {}, null, `❌ No common prefix found.`);
+          return;
+        }
+      }
+      pushState(prefix.split(''), [], {}, {}, prefix.split('').map((_,x)=>x), [], [], [], null, { Target: strs[i] }, null, `✅ "${strs[i]}" starts with "${prefix}"`);
+    }
+    pushState(prefix.split(''), [], {}, {}, [], [], prefix.split('').map((_,x)=>x), [], null, {}, null, `✅ Longest Common Prefix: "${prefix}"`);
+  };
+
+  const runSlidingWindow = (arr, pushState) => {
     const map = {};
     let maxLen = 0, l = 0;
-    
     for (let r = 0; r < arr.length; r++) {
-      setPointersA({ L: l, R: r });
-      setActiveA([r]);
       const c = arr[r];
-      
       if (map[c] !== undefined && map[c] >= l) {
-        addStep(`Duplicate '${c}' found. Shrinking window from left to ${map[c] + 1}.`);
+        pushState(arr, [], { L: l, R: r }, {}, [r], [], [], [], [l, r], { MaxLen: maxLen }, null, `Duplicate '${c}' found! Shrinking window from left.`);
         l = map[c] + 1;
       }
-      
       map[c] = r;
-      setWindowRangeA([l, r]);
-      const currentLen = r - l + 1;
-      maxLen = Math.max(maxLen, currentLen);
-      
-      setVariables({ maxLen, window: `[${l}, ${r}]`, length: currentLen });
-      addStep(`Window is "${arr.slice(l, r+1).join('')}". Length: ${currentLen}`);
-      await sleep(speed * 1.5, signal);
+      maxLen = Math.max(maxLen, r - l + 1);
+      pushState(arr, [], { L: l, R: r }, {}, [r], [], [], [], [l, r], { MaxLen: maxLen, Char: c }, null, `Window is "${arr.slice(l, r+1).join('')}". MaxLen: ${maxLen}`);
     }
+    pushState(arr, [], {}, {}, [], [], arr.map((_,i)=>i), [], null, { FinalMaxLen: maxLen }, null, `✅ Sliding window complete.`);
   };
 
-  const runMinWindow = async (arrA, arrB, signal) => {
-    addStep(`Minimum Window Substring: Finding "${arrB.join('')}" in "${arrA.join('')}"`);
-    const need = {}; const have = {};
-    for (const c of arrB) need[c] = (need[c] || 0) + 1;
-    let required = Object.keys(need).length;
-    let formed = 0;
-    
-    let l = 0, minLen = Infinity, bestL = -1, bestR = -1;
-    
-    for (let r = 0; r < arrA.length; r++) {
-      const c = arrA[r];
+  const runMinWindow = (s, t, pushState) => {
+    const need = {}, have = {};
+    for (const c of t) need[c] = (need[c] || 0) + 1;
+    let required = Object.keys(need).length, formed = 0;
+    let l = 0, minLen = Infinity, bestL = 0, bestR = 0;
+
+    for (let r = 0; r < s.length; r++) {
+      const c = s[r];
       have[c] = (have[c] || 0) + 1;
       if (need[c] && have[c] === need[c]) formed++;
       
-      setPointersA({ L: l, R: r });
-      setWindowRangeA([l, r]);
-      setVariables({ formed_req: `${formed}/${required}`, minLen: minLen === Infinity ? 'None' : minLen });
-      await sleep(speed * 0.5, signal);
+      pushState(s, t, { L: l, R: r }, {}, [r], [], [], [], [l, r], { Formed: `${formed}/${required}` }, null, `Expanding window right. Added '${c}'`);
       
       while (formed === required && l <= r) {
-        addStep(`Valid window found: "${arrA.slice(l, r+1).join('')}". Trying to shrink left.`);
         if (r - l + 1 < minLen) {
           minLen = r - l + 1;
           bestL = l; bestR = r;
-          setVariables({ formed_req: `${formed}/${required}`, minLen: minLen, best: `[${bestL},${bestR}]` });
-          setProcessedA(Array.from({length: minLen}, (_, i) => bestL + i));
-          await sleep(speed * 1.5, signal);
+          pushState(s, t, { L: l, R: r }, {}, [l, r], [], [], [], [l, r], { MinLen: minLen, Best: s.slice(bestL, bestR+1).join('') }, null, `✅ New min window found: "${s.slice(bestL, bestR+1).join('')}"`);
         }
         
-        const leftC = arrA[l];
+        const leftC = s[l];
         have[leftC]--;
         if (need[leftC] && have[leftC] < need[leftC]) formed--;
         l++;
-        setPointersA({ L: l, R: r });
-        setWindowRangeA([l, r]);
-        await sleep(speed * 0.5, signal);
+        pushState(s, t, { L: l, R: r }, {}, [l], [], [], [], [l, r], { Formed: `${formed}/${required}` }, null, `Shrinking window left. Removed '${leftC}'`);
       }
     }
-    addStep(minLen === Infinity ? "No valid window found." : `Smallest window: "${arrA.slice(bestL, bestR+1).join('')}"`);
+    pushState(s, t, {}, {}, [], [], Array.from({length: minLen}, (_,i)=>bestL+i), [], null, { Final: s.slice(bestL, bestR+1).join('') }, null, `✅ Min Window: "${s.slice(bestL, bestR+1).join('')}"`);
   };
 
-  const runKMP = async (text, pattern, signal) => {
-    addStep('KMP Algorithm: Building LPS array for pattern.');
-    const lps = new Array(pattern.length).fill(0);
-    setSecondaryArray({ name: 'LPS Array', data: [...lps] });
-    
+  const runNaiveMatch = (txt, pat, pushState) => {
+    for (let i = 0; i <= txt.length - pat.length; i++) {
+      let match = true;
+      pushState(txt, pat, { txtStart: i }, { patStart: 0 }, [i], [0], [], [], null, {}, null, `Testing pattern starting at index ${i}`);
+      for (let j = 0; j < pat.length; j++) {
+        pushState(txt, pat, { txtCurr: i+j }, { patCurr: j }, [i+j], [j], [], [], null, {}, null, `Comparing '${txt[i+j]}' and '${pat[j]}'`);
+        if (txt[i+j] !== pat[j]) {
+          match = false;
+          pushState(txt, pat, { txtCurr: i+j }, { patCurr: j }, [i+j], [j], [], [], null, {}, null, `❌ Mismatch at index ${i+j}.`);
+          break;
+        }
+      }
+      if (match) {
+        pushState(txt, pat, {}, {}, [], [], Array.from({length:pat.length}, (_,idx)=>i+idx), pat.map((_,idx)=>idx), null, {}, null, `✅ Pattern found at index ${i}!`);
+        return;
+      }
+    }
+    pushState(txt, pat, {}, {}, [], [], [], [], null, {}, null, `❌ Pattern not found.`);
+  };
+
+  const runKMP = (txt, pat, pushState) => {
+    const lps = new Array(pat.length).fill(0);
     let len = 0, i = 1;
-    while (i < pattern.length) {
-      setPointersB({ len, i });
-      await sleep(speed, signal);
-      if (pattern[i] === pattern[len]) {
+    pushState(txt, pat, {}, {}, [], [], [], [], null, {}, { name: 'LPS', data: [...lps] }, `Building LPS Array...`);
+    while (i < pat.length) {
+      if (pat[i] === pat[len]) {
         len++; lps[i] = len; i++;
-        setSecondaryArray({ name: 'LPS Array', data: [...lps] });
       } else {
         if (len !== 0) len = lps[len - 1];
         else { lps[i] = 0; i++; }
       }
     }
-    
-    addStep('LPS built. Starting search in text.');
+    pushState(txt, pat, {}, {}, [], [], [], [], null, {}, { name: 'LPS', data: [...lps] }, `✅ LPS Built: [${lps.join(',')}]`);
+
     let iTxt = 0, jPat = 0;
-    while (iTxt < text.length) {
-      setPointersA({ txt: iTxt });
-      setPointersB({ pat: jPat });
-      setActiveA([iTxt]); setActiveB([jPat]);
-      
-      addStep(`Comparing text[${iTxt}]='${text[iTxt]}' with pattern[${jPat}]='${pattern[jPat]}'`);
-      await sleep(speed * 1.2, signal);
-      
-      if (text[iTxt] === pattern[jPat]) {
-        iTxt++; jPat++;
-      }
-      
-      if (jPat === pattern.length) {
-        addStep(`Pattern found starting at index ${iTxt - jPat}!`);
-        setProcessedA(prev => [...prev, ...Array.from({length: pattern.length}, (_, x) => iTxt - jPat + x)]);
-        await sleep(speed * 2, signal);
-        jPat = lps[jPat - 1];
-      } else if (iTxt < text.length && text[iTxt] !== pattern[jPat]) {
+    while (iTxt < txt.length) {
+      pushState(txt, pat, { txt: iTxt }, { pat: jPat }, [iTxt], [jPat], [], [], null, {}, { name: 'LPS', data: [...lps] }, `Comparing txt[${iTxt}]='${txt[iTxt]}' and pat[${jPat}]='${pat[jPat]}'`);
+      if (txt[iTxt] === pat[jPat]) { iTxt++; jPat++; }
+      if (jPat === pat.length) {
+        pushState(txt, pat, {}, {}, [], [], Array.from({length:pat.length}, (_,idx)=>iTxt-jPat+idx), pat.map((_,x)=>x), null, {}, { name: 'LPS', data: [...lps] }, `✅ Pattern found at index ${iTxt - jPat}!`);
+        return;
+      } else if (iTxt < txt.length && txt[iTxt] !== pat[jPat]) {
         if (jPat !== 0) {
-          addStep(`Mismatch. Using LPS to skip backtrack. j becomes ${lps[jPat - 1]}`);
           jPat = lps[jPat - 1];
+          pushState(txt, pat, { txt: iTxt }, { pat: jPat }, [iTxt], [jPat], [], [], null, {}, { name: 'LPS', data: [...lps] }, `Mismatch. LPS says skip to pat[${jPat}]`);
         } else {
           iTxt++;
         }
       }
     }
-    addStep('Search complete.');
+    pushState(txt, pat, {}, {}, [], [], [], [], null, {}, { name: 'LPS', data: [...lps] }, `❌ Pattern not found.`);
   };
 
-  // Helper to render string character cells
+  const runRabinKarp = (txt, pat, pushState) => {
+    const d = 256, q = 101;
+    const M = pat.length, N = txt.length;
+    let p = 0, t = 0, h = 1;
+    
+    for (let i = 0; i < M - 1; i++) h = (h * d) % q;
+    for (let i = 0; i < M; i++) {
+      p = (d * p + pat[i].charCodeAt(0)) % q;
+      t = (d * t + txt[i].charCodeAt(0)) % q;
+    }
+    
+    pushState(txt, pat, {}, {}, [], [], [], [], null, { PatHash: p, TxtHash: t }, null, `Initial Hash Pat: ${p}, Window: ${t}`);
+    
+    for (let i = 0; i <= N - M; i++) {
+      pushState(txt, pat, { start: i }, {}, [], [], [], [], [i, i+M-1], { PatHash: p, TxtHash: t }, null, `Comparing hashes at index ${i}`);
+      if (p === t) {
+        pushState(txt, pat, { start: i }, {}, [], [], [], [], [i, i+M-1], { PatHash: p, TxtHash: t }, null, `Hash Match! Double checking string...`);
+        let match = true;
+        for (let j = 0; j < M; j++) if (txt[i+j] !== pat[j]) match = false;
+        if (match) {
+          pushState(txt, pat, {}, {}, [], [], Array.from({length:M}, (_,idx)=>i+idx), pat.map((_,x)=>x), null, {}, null, `✅ Exact Match at index ${i}!`);
+          return;
+        }
+      }
+      if (i < N - M) {
+        t = (d * (t - txt[i].charCodeAt(0) * h) + txt[i + M].charCodeAt(0)) % q;
+        if (t < 0) t = t + q;
+      }
+    }
+    pushState(txt, pat, {}, {}, [], [], [], [], null, {}, null, `❌ Pattern not found.`);
+  };
+
+  const runZAlgorithm = (s, pushState) => {
+    const n = s.length;
+    const z = new Array(n).fill(0);
+    let l = 0, r = 0;
+    
+    pushState(s, [], {}, {}, [], [], [], [], null, {}, { name: 'Z Array', data: [...z] }, `Building Z Array...`);
+    
+    for (let i = 1; i < n; i++) {
+      if (i <= r) z[i] = Math.min(r - i + 1, z[i - l]);
+      while (i + z[i] < n && s[z[i]] === s[i + z[i]]) z[i]++;
+      if (i + z[i] - 1 > r) { l = i; r = i + z[i] - 1; }
+      pushState(s, [], { i, L: l, R: r }, {}, [i], [], [], [], [l, r], {}, { name: 'Z Array', data: [...z] }, `Computed Z[${i}] = ${z[i]}`);
+    }
+    pushState(s, [], {}, {}, [], [], [], [], null, {}, { name: 'Z Array', data: [...z] }, `✅ Z Array complete.`);
+  };
+
+  const runManacher = (arr, pushState) => {
+    const t = '#' + arr.join('#') + '#';
+    const n = t.length;
+    const p = new Array(n).fill(0);
+    let c = 0, r = 0;
+    
+    pushState(t.split(''), [], {}, {}, [], [], [], [], null, {}, { name: 'Palin Radii', data: [...p] }, `Transformed string with '#' to handle evens.`);
+    
+    for (let i = 0; i < n; i++) {
+      let mirror = 2 * c - i;
+      if (i < r) p[i] = Math.min(r - i, p[mirror]);
+      while (i + p[i] + 1 < n && i - p[i] - 1 >= 0 && t[i + p[i] + 1] === t[i - p[i] - 1]) p[i]++;
+      if (i + p[i] > r) { c = i; r = i + p[i]; }
+      pushState(t.split(''), [], { i, C: c, R: r }, {}, [i], [], [], [], [i - p[i], i + p[i]], {}, { name: 'Palin Radii', data: [...p] }, `Radii at ${i} is ${p[i]}`);
+    }
+    
+    let maxL = Math.max(...p);
+    pushState(t.split(''), [], {}, {}, [], [], [], [], null, {}, { name: 'Palin Radii', data: [...p] }, `✅ Manacher complete. Max length: ${maxL}`);
+  };
+
+
+  // --- Playback Controls ---
+  const handlePlayPause = () => { if (trace.length === 0) executeAlgo(); else setIsPlaying(!isPlaying); };
+  const handleNext = () => { setIsPlaying(false); if (currentStep < trace.length - 1) setCurrentStep(c => c + 1); };
+  const handlePrev = () => { setIsPlaying(false); if (currentStep > 0) setCurrentStep(c => c - 1); };
+
+  // --- Rendering ---
+  const currentState = trace[currentStep] || { strA: getInitialData().a, strB: getInitialData().b, pointersA: {}, pointersB: {}, activeA: [], activeB: [], processedA: [], processedB: [], windowRangeA: null, variables: {}, secondaryArray: null, msg: 'Ready.' };
+  const historySteps = trace.slice(0, currentStep + 1).map(t => t.msg).filter(m => m);
+
   const renderString = (arr, pointers, active, processed, windowRng) => (
     <div style={{ position: 'relative', display: 'flex', flexWrap: 'wrap', gap: '4px', justifyContent: 'center' }}>
       {arr.map((val, idx) => {
         const isActive = active.includes(idx);
         const isProcessed = processed.includes(idx);
         const inWindow = windowRng && idx >= windowRng[0] && idx <= windowRng[1];
-        
-        let bg = 'rgba(255,255,255,0.05)', border = '1px solid rgba(255,255,255,0.1)';
-        let color = 'var(--text-muted)', shadow = 'none';
-
-        if (isActive) {
-          bg = 'var(--active-accent)'; border = '1px solid var(--active-accent)';
-          color = '#000'; shadow = '0 0 15px var(--active-accent)';
-        } else if (inWindow) {
-          bg = 'rgba(255,255,255,0.15)'; border = '1px solid var(--active-accent)';
-          color = '#fff';
-        } else if (isProcessed) {
-          bg = 'rgba(0, 255, 136, 0.2)'; border = '1px solid #00ff88';
-          color = '#00ff88';
-        }
-
+        let bg = 'rgba(255,255,255,0.05)', border = '1px solid rgba(255,255,255,0.1)', color = 'var(--text-muted)', shadow = 'none';
+        if (isActive) { bg = 'var(--active-accent)'; border = '1px solid var(--active-accent)'; color = '#000'; shadow = '0 0 15px var(--active-accent)'; }
+        else if (inWindow) { bg = 'rgba(255,255,255,0.15)'; border = '1px solid var(--active-accent)'; color = '#fff'; }
+        else if (isProcessed) { bg = 'rgba(0, 255, 136, 0.2)'; border = '1px solid #00ff88'; color = '#00ff88'; }
         const myPointers = Object.entries(pointers).filter(([_, pIdx]) => pIdx === idx);
 
         return (
-          <div key={idx} style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <div style={{ height: '20px', display: 'flex', gap: '2px', alignItems: 'flex-end', marginBottom: '4px' }}>
               {myPointers.map(([pName]) => (
-                <div key={pName} style={{ background: '#ff00ff', color: '#fff', fontSize: '0.6rem', padding: '2px 4px', borderRadius: '4px', fontFamily: 'monospace' }}>
-                  {pName} ↓
-                </div>
+                <div key={pName} style={{ background: '#ff00ff', color: '#fff', fontSize: '0.6rem', padding: '2px 4px', borderRadius: '4px', fontFamily: 'monospace' }}>{pName} ↓</div>
               ))}
             </div>
-            <div style={{
-              width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: bg, border: border, borderRadius: '6px', color: color,
-              fontSize: '1.2rem', fontWeight: isActive || isProcessed || inWindow ? 'bold' : 'normal',
-              boxShadow: shadow, transition: 'all 0.2s ease', fontFamily: 'Fira Code, monospace'
-            }}>
+            <div style={{ width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: bg, border, borderRadius: '6px', color, fontSize: '1.2rem', fontWeight: isActive || isProcessed || inWindow ? 'bold' : 'normal', boxShadow: shadow, transition: 'all 0.2s ease', fontFamily: 'Fira Code, monospace' }}>
               {val}
             </div>
             <div style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.3)', marginTop: '4px' }}>{idx}</div>
@@ -385,43 +398,50 @@ const StringVisualizer = ({ algorithmId }) => {
         
         {/* Controls */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem', flexShrink: 0 }}>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <button onClick={() => { setMode('auto'); reset(); }}
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button onClick={() => { setMode('auto'); initStrings(); setTimeout(executeAlgo, 100); }}
               style={{ padding: '0.25rem 0.65rem', borderRadius: '4px', border: '1px solid var(--panel-border)', background: mode === 'auto' ? 'var(--active-accent)' : 'transparent', color: mode === 'auto' ? '#000' : '#fff', cursor: 'pointer', fontSize: '0.8rem' }}>
-              Auto
+              Auto Demo
             </button>
             <button onClick={() => setMode('custom')}
               style={{ padding: '0.25rem 0.65rem', borderRadius: '4px', border: '1px solid var(--panel-border)', background: mode === 'custom' ? 'var(--active-accent)' : 'transparent', color: mode === 'custom' ? '#000' : '#fff', cursor: 'pointer', fontSize: '0.8rem' }}>
               Custom
             </button>
             {mode === 'custom' && (
-              <div style={{ display: 'flex', gap: '4px' }}>
-                <input type="text" placeholder="String 1" value={customInputA} onChange={e => setCustomInputA(e.target.value)}
-                  style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid var(--panel-border)', color: '#fff', padding: '0.25rem 0.5rem', borderRadius: '4px', width: '100px', fontSize: '0.8rem' }} />
+              <>
+                <input type="text" placeholder={algorithmId === 'longest_common_prefix' ? "e.g. flow,flight" : "String 1"} value={customInputA}
+                  onChange={e => setCustomInputA(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && applyCustom()}
+                  style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid var(--panel-border)', color: '#fff', padding: '0.25rem 0.5rem', borderRadius: '4px', width: '120px', fontSize: '0.8rem' }} />
                 {needsTwoStrings && (
-                  <input type="text" placeholder="String 2" value={customInputB} onChange={e => setCustomInputB(e.target.value)}
-                    style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid var(--panel-border)', color: '#fff', padding: '0.25rem 0.5rem', borderRadius: '4px', width: '100px', fontSize: '0.8rem' }} />
+                  <input type="text" placeholder="String 2" value={customInputB}
+                    onChange={e => setCustomInputB(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && applyCustom()}
+                    style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid var(--panel-border)', color: '#fff', padding: '0.25rem 0.5rem', borderRadius: '4px', width: '120px', fontSize: '0.8rem' }} />
                 )}
                 <button onClick={applyCustom}
                   style={{ padding: '0.25rem 0.6rem', borderRadius: '4px', border: '1px solid var(--active-accent)', background: 'transparent', color: '#fff', cursor: 'pointer', fontSize: '0.8rem' }}>
                   Apply
                 </button>
-              </div>
+              </>
             )}
             <div style={{ width: '1px', height: '20px', background: 'rgba(255,255,255,0.15)', margin: '0 4px' }} />
-            <input type="range" min="20" max="600" value={600 - speed + 20} onChange={e => setSpeed(600 - parseInt(e.target.value) + 20)} style={{ width: '80px', accentColor: 'var(--active-accent)' }} />
+            <div style={{ display: 'flex', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--panel-border)', borderRadius: '4px', overflow: 'hidden' }}>
+              <button onClick={handlePrev} disabled={currentStep === 0 || trace.length === 0} style={{ padding: '0.25rem 0.5rem', background: 'transparent', border: 'none', borderRight: '1px solid var(--panel-border)', color: '#fff', cursor: 'pointer', opacity: currentStep === 0 ? 0.3 : 1 }}>⏮</button>
+              <button onClick={handlePlayPause} style={{ padding: '0.25rem 0.75rem', background: isPlaying ? 'rgba(255,255,255,0.1)' : 'transparent', border: 'none', color: 'var(--active-accent)', fontWeight: 'bold', cursor: 'pointer', width: '60px' }}>{isPlaying ? '⏸' : '▶️'}</button>
+              <button onClick={handleNext} disabled={currentStep >= trace.length - 1} style={{ padding: '0.25rem 0.5rem', background: 'transparent', border: 'none', borderLeft: '1px solid var(--panel-border)', color: '#fff', cursor: 'pointer', opacity: currentStep >= trace.length - 1 ? 0.3 : 1 }}>⏭</button>
+            </div>
+            <input type="range" min="100" max="1500" value={1500 - speed + 100} onChange={e => setSpeed(1500 - parseInt(e.target.value) + 100)} style={{ width: '80px', accentColor: 'var(--active-accent)' }} />
           </div>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button onClick={reset} disabled={isRunning} style={{ background: 'transparent', border: '1px solid var(--panel-border)', color: '#fff', padding: '0.35rem 0.8rem', borderRadius: '4px', cursor: isRunning ? 'not-allowed' : 'pointer', opacity: isRunning ? 0.5 : 1, fontSize: '0.8rem' }}>Reset</button>
-            <button onClick={isRunning ? abort : execute} style={{ background: isRunning ? '#ff4444' : 'var(--active-accent)', border: 'none', color: '#000', fontWeight: 'bold', padding: '0.35rem 1.2rem', borderRadius: '4px', cursor: 'pointer', boxShadow: '0 0 10px var(--active-accent)', fontSize: '0.8rem' }}>{isRunning ? 'Stop' : 'Execute'}</button>
+            <button onClick={initStrings} style={{ background: 'transparent', border: '1px solid var(--panel-border)', color: '#fff', padding: '0.35rem 0.8rem', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>Reset</button>
           </div>
         </div>
-        {errorMsg && <div style={{ color: '#ff4444', marginBottom: '0.5rem', fontSize: '0.8rem' }}>{errorMsg}</div>}
 
         {/* Variables Tracker */}
-        {Object.keys(variables).length > 0 && (
+        {Object.keys(currentState.variables).length > 0 && (
           <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', padding: '0.75rem', background: 'rgba(0,0,0,0.3)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap' }}>
-            {Object.entries(variables).map(([key, val]) => (
+            {Object.entries(currentState.variables).map(([key, val]) => (
               <div key={key} style={{ display: 'flex', flexDirection: 'column' }}>
                 <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>{key}</span>
                 <span style={{ fontSize: '1.1rem', fontWeight: 'bold', color: 'var(--active-accent)', fontFamily: 'Fira Code, monospace' }}>{val}</span>
@@ -432,31 +452,33 @@ const StringVisualizer = ({ algorithmId }) => {
 
         {/* Visualization Area */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2rem', overflowY: 'auto' }}>
-          
           <div style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>{needsTwoStrings ? 'Text / Target String' : 'String'}</div>
-          {renderString(strA, pointersA, activeA, processedA, windowRangeA)}
+          {renderString(currentState.strA, currentState.pointersA, currentState.activeA, currentState.processedA, currentState.windowRangeA)}
           
           {needsTwoStrings && (
             <>
               <div style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '1rem' }}>Pattern / Match String</div>
-              {renderString(strB, pointersB, activeB, processedB, null)}
+              {renderString(currentState.strB, currentState.pointersB, currentState.activeB, currentState.processedB, null)}
             </>
           )}
 
-          {secondaryArray && (
+          {currentState.secondaryArray && (
             <div style={{ position: 'relative', marginTop: '1rem' }}>
-              <div style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>{secondaryArray.name}</div>
+              <div style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>{currentState.secondaryArray.name}</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', justifyContent: 'center' }}>
-                {secondaryArray.data.map((val, idx) => (
-                  <div key={idx} style={{ width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,255,136,0.1)', border: '1px solid rgba(0,255,136,0.3)', borderRadius: '6px', color: '#00ff88', fontSize: '1.1rem', fontFamily: 'Fira Code, monospace' }}>{val}</div>
+                {currentState.secondaryArray.data.map((val, idx) => (
+                  <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <div style={{ width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,255,136,0.1)', border: '1px solid rgba(0,255,136,0.3)', borderRadius: '6px', color: '#00ff88', fontSize: '1.1rem', fontFamily: 'Fira Code, monospace' }}>{val}</div>
+                    <div style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.3)', marginTop: '4px' }}>{idx}</div>
+                  </div>
                 ))}
               </div>
             </div>
           )}
-
         </div>
+
       </div>
-      <StepLog steps={steps} />
+      <StepLog steps={historySteps} currentStep={currentStep} />
     </div>
   );
 };

@@ -8,6 +8,10 @@ import TreeVisualizer from './algorithms/TreeVisualizer';
 import StackQueueVisualizer from './algorithms/StackQueueVisualizer';
 import HashVisualizer from './algorithms/HashVisualizer';
 import DPTableVisualizer from './algorithms/DPTableVisualizer';
+import RecursionBacktrackingVisualizer from './algorithms/RecursionBacktrackingVisualizer';
+import GreedyVisualizer from './algorithms/GreedyVisualizer';
+import MathBitVisualizer from './algorithms/MathBitVisualizer';
+import AdvancedDSAVisualizer from './algorithms/AdvancedDSAVisualizer';
 
 // IDs that have dedicated visualizers
 const SORT_IDS = new Set([
@@ -59,6 +63,24 @@ const GRAPH_IDS = new Set([
 const DP_IDS = new Set([
   'fib_dp', 'climbing_stairs', 'knapsack_01', 'coin_change', 'lcs', 
   'lis', 'edit_distance', 'matrix_chain', 'house_robber', 'subset_sum'
+]);
+
+const RECURSION_BACKTRACKING_IDS = new Set([
+  'factorial', 'fibonacci', 'subsets', 'permutations', 'combination_sum', 'generate_parens',
+  'n_queens', 'sudoku', 'word_search', 'palindrome_partition'
+]);
+
+const GREEDY_IDS = new Set([
+  'huffman', 'activity_selection', 'fractional_knapsack', 'jump_game', 'candy_distribution'
+]);
+
+const MATH_BIT_IDS = new Set([
+  'sieve', 'gcd_euclid', 'fast_expo', 'prime_factorization', 'modular_arithmetic',
+  'xor_tricks', 'power_of_two', 'count_set_bits', 'subsets_bitmask'
+]);
+
+const ADVANCED_DSA_IDS = new Set([
+  'trie', 'segment_tree', 'fenwick_tree', 'sparse_table', 'rolling_hash'
 ]);
 
 const ComingSoon = ({ algorithm, category }) => (
@@ -118,6 +140,18 @@ const VizView = ({ algorithm, category }) => {
     }
     if (HASH_IDS.has(algorithm.id)) {
       return <HashVisualizer algorithmId={algorithm.id} />;
+    }
+    if (RECURSION_BACKTRACKING_IDS.has(algorithm.id)) {
+      return <RecursionBacktrackingVisualizer algorithmId={algorithm.id} />;
+    }
+    if (GREEDY_IDS.has(algorithm.id)) {
+      return <GreedyVisualizer algorithmId={algorithm.id} />;
+    }
+    if (MATH_BIT_IDS.has(algorithm.id)) {
+      return <MathBitVisualizer algorithmId={algorithm.id} />;
+    }
+    if (ADVANCED_DSA_IDS.has(algorithm.id)) {
+      return <AdvancedDSAVisualizer algorithmId={algorithm.id} />;
     }
     return <ComingSoon algorithm={algorithm} category={category} />;
   };
